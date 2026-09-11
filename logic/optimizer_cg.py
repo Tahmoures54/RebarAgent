@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import threading
-from collections import Counter
-from typing import List, Optional
+from collections import Counter, defaultdict
+from typing import Dict, List, Optional
 
 from utils.logger import setup_logger
 from logic.optimizer_options import OptimizerOptions
@@ -18,6 +18,49 @@ try:
     from pulp import LpProblem, LpVariable, LpMinimize, LpMaximize, lpSum, value, PULP_CBC_CMD
 except ImportError:
     LpProblem = LpVariable = LpMinimize = LpMaximize = lpSum = value = PULP_CBC_CMD = None
+
+
+def integer_patterns_to_bins(
+    lengths: List[float],
+    types_mm: List[int],
+    patterns: List[List[int]],
+    pattern_counts: List[int],
+    scale: int,
+    stock_length: float,
+) -> List[List[float]]:
+    """
+    Materialize an integer cutting-stock solution into bins of original lengths.
+
+    Extra pattern copies from '>= demand' constraints are skipped once the pool
+    of remaining pieces is empty. Any leftover pieces are packed with FFD.
+    """
+    pool: Dict[int, List[float]] = defaultdict(list)
+    for length in lengths:
+        pool[int(round(float(length) * scale))].append(float(length))
+
+    bins: List[List[float]] = []
+    for pattern, times in zip(patterns, pattern_counts):
+        n_times = int(times or 0)
+        if n_times <= 0:
+            continue
+        for _ in range(n_times):
+            needed: List[int] = []
+            for i, typ in enumerate(types_mm):
+                cnt = int(pattern[i] or 0)
+                if cnt > 0:
+                    needed.extend([typ] * cnt)
+            if not needed:
+                continue
+            need_counts = Counter(needed)
+            if any(len(pool[typ]) < n for typ, n in need_counts.items()):
+                # Over-coverage from >= demand — skip unused copies.
+                continue
+            bins.append([pool[typ].pop() for typ in needed])
+
+    leftover = [piece for pieces in pool.values() for piece in pieces]
+    if leftover:
+        bins.extend(_ffd_bins(leftover, stock_length))
+    return bins
 
 
 def optimize_cuts(
@@ -95,5 +138,27 @@ def optimize_cuts(
     if cancel_event and cancel_event.is_set():
         return []
     master_int.solve(PULP_CBC_CMD(msg=1 if opts.verbose else 0, timeLimit=max(1, opts.mip_time_limit)))
-    result_bins = _ffd_bins(lengths, stock_length)
-    return result_bins if result_bins else _ffd_bins(lengths, stock_length)
+
+    fallback = _ffd_bins(lengths, stock_length)
+    try:
+        z_counts = [int(round(float(value(zj) or 0))) for zj in z]
+    except Exception as e:
+        logger.warning("CG integer master unreadable (%s); FFD fallback", e)
+        return fallback
+    if not any(c > 0 for c in z_counts):
+        logger.warning("CG integer master empty; FFD fallback")
+        return fallback
+
+    try:
+        bins = integer_patterns_to_bins(lengths, types, patterns, z_counts, scale, stock_length)
+    except Exception as e:
+        logger.warning("CG pattern expand failed (%s); FFD fallback", e)
+        return fallback
+    packed = sum(len(b) for b in bins)
+    if packed != len(lengths):
+        logger.warning("CG packing count %s != demand %s; FFD fallback", packed, len(lengths))
+        return fallback
+    if fallback and len(bins) > len(fallback):
+        # Never ship a worse packing than the cheap heuristic.
+        return fallback
+    return bins or fallback

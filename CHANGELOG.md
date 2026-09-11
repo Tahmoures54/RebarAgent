@@ -1,5 +1,20 @@
 # RebarAgent Changelog
 
+## [1.6.1] – 2026-09-11 (Correctness & Iran-first hardening)
+- **Cutting optimizer** now materializes the integer column-generation solution (was discarded, always FFD)
+- **Scrap bank** keeps identical leftover bars as separate pieces instead of collapsing them
+- **Confirm/rollback stock** uses the correct stock-row layout (5- and 6-column)
+- **Migrations** no longer mark a failed schema change as complete
+- **Sample project** uses real BS 8666 params (`L` / bent shapes 11 & 21) so lengths calculate
+- **Lap splice** supports Mabhas 9, Eurocode 2, ACI 318, and n×db; dialog is wired to the calculator
+- **Excel import** maps Persian headers, normalizes shape/standard codes, maps A→L for straight bars
+- Splash/welcome/exports show **RebarAgent** and the real app version (was "AI Rebar v7.4")
+- Listofer "Show All" filter works in Persian UI
+- Doctor checks optimizer + Excel import; expanded automated tests
+
+## [1.6.0] – First-win pack
+- Sample project, Excel import/template, Savings report after Confirm
+
 ## [1.0.0] – 2026-08-27 (Rebrand & Foundation Improvements)
 - Full rebrand AiRebar → **RebarAgent**; trial 14 days; themes Turquoise/Light/Dark
 
@@ -49,6 +64,3 @@
 
 ## [1.5.4] – Agent brain layer
 - `logic/agent_brain.py` health score + actions
-
-## [1.6.0] – First-win pack
-- Sample project, Excel import/template, Savings report after Confirm

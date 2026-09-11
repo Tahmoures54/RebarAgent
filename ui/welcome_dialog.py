@@ -8,6 +8,8 @@ import os
 import sqlite3
 from typing import Callable, Optional
 
+from config import APP_VERSION, APP_NAME
+
 class WelcomeDialog(tk.Toplevel):
     """
     Redesigned welcome dialog:
@@ -58,10 +60,10 @@ class WelcomeDialog(tk.Toplevel):
         # Left: links
         links_frame = tk.Frame(self.footer, bg="#f8fafc")
         links_frame.pack(side="left", padx=10)
-        site = tk.Label(links_frame, text="www.airebar.io", font=("Segoe UI Variable", 8, "underline"),
+        site = tk.Label(links_frame, text="github.com/Tahmoures54/AiRebar", font=("Segoe UI Variable", 8, "underline"),
                         fg=self.accent, bg="#f8fafc", cursor="hand2")
         site.pack(side="left", padx=(0,8))
-        site.bind("<Button-1>", lambda e: webbrowser.open("https://airebar.io"))
+        site.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/Tahmoures54/AiRebar"))
         wa = tk.Label(links_frame, text="💬 WhatsApp", font=("Segoe UI Variable", 8, "underline"),
                       fg="#16a34a", bg="#f8fafc", cursor="hand2")
         wa.pack(side="left")
@@ -204,14 +206,14 @@ class WelcomeDialog(tk.Toplevel):
         header = tk.Frame(body, bg=self.bg)
         header.pack(fill="x", pady=(16, 0))
 
-        tk.Label(header, text="AI Rebar", font=("Segoe UI Variable", 24, "bold"),
+        tk.Label(header, text=APP_NAME, font=("Segoe UI Variable", 24, "bold"),
                  bg=self.bg, fg="#dc2626", anchor="center").pack()
         tk.Label(header, text="Intelligent Rebar Cutting & Inventory Management",
                  font=("Segoe UI Variable", 11), bg=self.bg, fg="#64748b", anchor="center").pack()
 
         ver_frame = tk.Frame(header, bg=self.bg)
         ver_frame.pack(pady=(2, 0))
-        tk.Label(ver_frame, text="v7.4", font=("Segoe UI Variable", 8, "bold"),
+        tk.Label(ver_frame, text=f"v{APP_VERSION}", font=("Segoe UI Variable", 8, "bold"),
                  bg="#E0F7FA", fg="#006064", padx=8, pady=2).pack()
 
         ttk.Separator(body, orient="horizontal").pack(fill="x", padx=30, pady=12)
@@ -264,7 +266,7 @@ class WelcomeDialog(tk.Toplevel):
         ttk.Separator(content, orient="horizontal").pack(fill="x", pady=12)
 
         # Why AI Rebar?
-        tk.Label(content, text="🚀 Why AI Rebar?", font=("Segoe UI Variable", 11, "bold"),
+        tk.Label(content, text="🚀 Why RebarAgent?", font=("Segoe UI Variable", 11, "bold"),
                  bg=self.bg, fg="#0D7377", anchor="w").pack(fill="x", pady=(0, 6))
 
         benefits = [

@@ -1,6 +1,6 @@
 # utils/cutting_plan_export.py
 """
-Cutting Plan Export – Ultra‑Professional HTML Report for AI Rebar.
+Cutting Plan Export – Ultra‑Professional HTML Report for RebarAgent.
 - Accepts pre‑calculated plans to avoid re‑optimisation
 - Smart SVG labeling (Length, Position, Listofer)
 - Minimal design, print‑optimised, saves toner & paper
@@ -33,9 +33,9 @@ except ImportError:
 
 # ---------- Company info (footer & branding) ----------
 COMPANY_INFO = {
-    "name": "AI Rebar",
+    "name": "RebarAgent",
     "phone": "+98 916 068 4552",
-    "website": "https://airebar.io",
+    "website": "https://github.com/Tahmoures54/AiRebar",
 }
 _whatsapp_number = ''.join(filter(str.isdigit, COMPANY_INFO['phone']))
 WHATSAPP_LINK = f"https://wa.me/{_whatsapp_number}"

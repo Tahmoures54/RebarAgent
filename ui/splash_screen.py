@@ -7,9 +7,10 @@ Uses the application's turquoise colour palette and displays the correct version
 import tkinter as tk
 from tkinter import ttk
 try:
-    from config import VERSION
+    from config import APP_VERSION, APP_NAME
 except ImportError:
-    VERSION = "7.4"   # fallback if config doesn't export VERSION
+    APP_VERSION = "1.6.1"
+    APP_NAME = "RebarAgent"
 
 _TITLE_FONT = ("Segoe UI", 28, "bold")
 _SUBTITLE_FONT = ("Segoe UI", 10)
@@ -55,13 +56,13 @@ class SplashScreen(tk.Toplevel):
         logo_canvas.create_line(65, 5, 53, 5, fill="#006064", width=3)
 
         # ── App name & tagline ───────────────────────────────────
-        tk.Label(inner, text="AI Rebar", font=_TITLE_FONT,
+        tk.Label(inner, text=APP_NAME, font=_TITLE_FONT,
                  fg="#006064", bg="#E0F7FA").pack(pady=(2, 0))
         tk.Label(inner, text="Intelligent Bar Bending Schedule",
                  font=_SUBTITLE_FONT, fg="#004D40", bg="#E0F7FA").pack()
 
         # ── Version ─────────────────────────────────────────────
-        tk.Label(inner, text=f"Version {VERSION}",
+        tk.Label(inner, text=f"Version {APP_VERSION}",
                  font=_VERSION_FONT, fg="#0097A7", bg="#E0F7FA").pack(pady=(2, 0))
 
         # ── Animated loading text ────────────────────────────────
@@ -80,7 +81,7 @@ class SplashScreen(tk.Toplevel):
         self.progress.start(12)
 
         # ── Footer ───────────────────────────────────────────────
-        tk.Label(inner, text="© 2026 AI Rebar. All rights reserved.",
+        tk.Label(inner, text=f"© 2026 {APP_NAME}. All rights reserved.",
                  font=_FOOTER_FONT, fg="#0097A7", bg="#E0F7FA").pack(side="bottom", pady=5)
 
         # ── Auto‑close fallback ─────────────────────────────────

@@ -40,14 +40,14 @@ def create_sample_project(force: bool = False) -> Dict[str, Any]:
     lf_c = ListoferModel.get_or_create(pid, "C-01", "Column stubs")
 
     bars = [
-        (lf_f, "B1", 16.0, "00", {"A": 5200}, 24, "Foundation", "Footing"),
-        (lf_f, "B2", 16.0, "00", {"A": 3800}, 18, "Foundation", "Footing"),
-        (lf_f, "B3", 12.0, "00", {"A": 2500}, 30, "Foundation", "Footing"),
-        (lf_f, "B4", 12.0, "00", {"A": 1800}, 20, "Foundation", "Footing"),
-        (lf_f, "S1", 10.0, "00", {"A": 900}, 40, "Foundation", "Stirrup"),
-        (lf_c, "V1", 20.0, "00", {"A": 4500}, 12, "Column", "Vertical"),
-        (lf_c, "V2", 20.0, "00", {"A": 3200}, 8, "Column", "Vertical"),
-        (lf_c, "T1", 10.0, "00", {"A": 1100}, 36, "Column", "Tie"),
+        (lf_f, "B1", 16.0, "00", {"L": 5200}, 24, "Foundation", "Footing"),
+        (lf_f, "B2", 16.0, "00", {"L": 3800}, 18, "Foundation", "Footing"),
+        (lf_f, "B3", 12.0, "11", {"A": 2500, "B": 400}, 30, "Foundation", "Footing"),
+        (lf_f, "B4", 12.0, "00", {"L": 1800}, 20, "Foundation", "Footing"),
+        (lf_f, "S1", 10.0, "21", {"A": 400, "B": 300}, 40, "Foundation", "Stirrup"),
+        (lf_c, "V1", 20.0, "00", {"L": 4500}, 12, "Column", "Vertical"),
+        (lf_c, "V2", 20.0, "11", {"A": 3200, "B": 500}, 8, "Column", "Vertical"),
+        (lf_c, "T1", 10.0, "21", {"A": 450, "B": 350}, 36, "Column", "Tie"),
     ]
 
     n_rebars = 0

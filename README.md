@@ -1,18 +1,20 @@
 # RebarAgent – Intelligent Bar Bending Schedule & Cutting Optimization
 
-**Version 1.6.0** | Desktop BBS + smart cutting for detailers and site teams
+**Version 1.6.1** | Desktop BBS + smart cutting for detailers and site teams
 
 RebarAgent is a professional **offline-first** desktop app for civil/structural engineers and rebar detailers. Create Bar Bending Schedules, optimize 1D cutting with multi-stock lengths, manage scrap and stock inventory, and export Excel / PDF / HTML / BVBS.
 
 Repository: https://github.com/Tahmoures54/AiRebar
 
-## Highlights (v1.6)
+## Highlights (v1.6.1)
 
-- **Cutting optimizer** – multi-length stock, kerf, min usable scrap, utilization metrics, confirm + rollback ledger
-- **Smart inventory** – Scrap Bank + Stock Manager; apply only on Confirm Plan; Force Re-optimize restores stock/scraps
+- **Cutting optimizer** – multi-length stock, kerf, min usable scrap; column-generation result is actually applied
+- **Smart inventory** – Scrap Bank + Stock Manager; identical offcuts stay as separate bars; Confirm/rollback stock is reliable
+- **Lap splice** – Mabhas 9, Eurocode 2, ACI 318, and site n×db rule
+- **Excel import** – English + Persian column headers, shape/standard aliases
 - **Agent brain** – health score, prioritized tips, one-click actions, Insights panel
-- **First-win UX** – sample project, Excel import + template, coach strip, savings report after confirm
-- **i18n** – English (default) + Persian
+- **First-win UX** – sample project with bent bars, Excel template, coach strip, savings report
+- **i18n** – English (default) + Persian (including “Show All” filter)
 - **Commercial** – Trial / Pro / Office / Lifetime; WhatsApp purchase (+989160684552)
 
 ## Quick start

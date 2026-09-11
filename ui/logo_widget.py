@@ -1,6 +1,6 @@
 # ui/logo_widget.py
 """
-Professional animated logo widget for AI Rebar.
+Professional animated logo widget for RebarAgent.
 The text resides inside the rebar loop, and a red slogan (not bold) is displayed
 underneath. Background matches the parent theme.
 """
@@ -27,7 +27,7 @@ class LogoWidget(tk.Canvas):
         slogan: str = "Cutting Optimization",
         slogan_font: Tuple[str, int, str] = ("Helvetica", 9, "italic"),  # not bold
         slogan_color: str = "#e74c3c",   # striking red
-        text: str = "AI Rebar",
+        text: str = "RebarAgent",
         speed_ms: int = 40,
         **kwargs
     ):

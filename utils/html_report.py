@@ -1,6 +1,6 @@
 # utils/html_report.py
 """
-Ultra‑Professional HTML Report Generator – AI Rebar
+Ultra‑Professional HTML Report Generator – RebarAgent
 - Tekla‑level BBS table with full shape SVG rendering
 - QR code encodes project info (name, listofer, date, user)
 - Branded footer, signature block, A4‑optimised layout
@@ -26,9 +26,9 @@ from qrcode.image.svg import SvgPathImage
 # Company branding
 # ----------------------------------------------------------------------
 COMPANY_INFO = {
-    "name": "AI Rebar",
+    "name": "RebarAgent",
     "phone": "+98 916 068 4552",
-    "website": "https://airebar.io",
+    "website": "https://github.com/Tahmoures54/AiRebar",
     "tagline": "Next‑Gen Rebar Detailing & BBS Automation",
     "brand_color": "#1e3a8a",
 }

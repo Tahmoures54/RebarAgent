@@ -2,7 +2,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import webbrowser
-from config import THEMES, AppTheme
+from config import THEMES, AppTheme, APP_NAME, PURCHASE_CONTACT
 from utils.license import get_license_info, get_machine_id, activate_license, format_license_status
 
 
@@ -18,13 +18,14 @@ class LicenseDialog(tk.Toplevel):
             theme = master.state.theme
         else:
             theme = AppTheme.TURQUOISE
-        colors = THEMES.get(theme, THEMES[AppTheme.TURQUOISE])
+        theme_key = getattr(theme, "value", theme)
+        colors = THEMES.get(theme_key) or THEMES[AppTheme.TURQUOISE.value]
         self.bg = colors["bg"]
         self.fg = colors["fg"]
         self.accent = colors["accent"]
-        self.button_style = f"{theme.value}.TButton"
+        self.button_style = f"{theme_key}.TButton"
 
-        self.title("🔓 AiRebar Pro - License")
+        self.title(f"{APP_NAME} Pro — License")
         self.resizable(False, False)
         self.transient(master)
         self.grab_set()
@@ -50,7 +51,7 @@ class LicenseDialog(tk.Toplevel):
         header = tk.Frame(self, bg=self.accent, height=70)
         header.pack(fill="x")
         header.pack_propagate(False)
-        tk.Label(header, text="🔓  Unlock AiRebar Pro",
+        tk.Label(header, text="Unlock RebarAgent Pro",
                  font=("Segoe UI", 16, "bold"), fg="white", bg=self.accent).pack(pady=12)
 
         main = tk.Frame(self, bg=self.bg, padx=30, pady=20)
@@ -107,7 +108,7 @@ class LicenseDialog(tk.Toplevel):
         support_msg = tk.Frame(main, bg=self.bg)
         support_msg.pack(fill="x", pady=5)
         tk.Label(support_msg, text="💛 Your license is our only source of income to cover heavy development "
-                                   "costs and team salaries. Every purchase directly supports the future of AiRebar.",
+                                   "costs and team salaries. Every purchase directly supports the future of RebarAgent.",
                  font=("Arial", 9, "italic"), fg="gray", bg=self.bg, wraplength=500, justify="left").pack(anchor="w")
 
         # ----- machine ID (needed for activation) -----
@@ -150,7 +151,7 @@ class LicenseDialog(tk.Toplevel):
             activebackground="#e59400", activeforeground="white",
             relief="flat", bd=0, padx=18, pady=10,
             cursor="hand2",
-            command=lambda: webbrowser.open("https://airebar.io/license")
+            command=lambda: webbrowser.open(f"https://wa.me/{PURCHASE_CONTACT['whatsapp_digits']}")
         )
         buy_website.pack(side="left", padx=(0, 15))
 
@@ -198,7 +199,7 @@ class LicenseDialog(tk.Toplevel):
         ttk.Separator(main, orient="horizontal").pack(fill="x", pady=15)
         tk.Label(main, text="Need help? Contact us:",
                  font=("Arial", 9, "bold"), fg=self.fg, bg=self.bg, anchor="w").pack(anchor="w")
-        tk.Label(main, text="🌐 www.airebar.io   |   💬 WhatsApp: +98 916 068 4552",
+        tk.Label(main, text=f"💬 WhatsApp: {PURCHASE_CONTACT['whatsapp']}",
                  font=("Arial", 9), fg="gray", bg=self.bg, anchor="w").pack(anchor="w")
 
     def _paste_code(self):

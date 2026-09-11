@@ -66,14 +66,11 @@ class TestOptimizeCuts:
         assert optimize_cuts([1.0, 2.0], -10) == []
 
     def test_fallback_without_pulp(self, monkeypatch):
-        orig = opt.PULP_AVAILABLE
-        monkeypatch.setattr(opt, "PULP_AVAILABLE", False)
+        monkeypatch.setattr("logic.optimizer_cg.PULP_AVAILABLE", False)
 
         bins = optimize_cuts([3.0, 5.0], 12.0)
         assert _counter(_flatten(bins)) == _counter([3.0, 5.0])
         _assert_feasible(bins, 12.0)
-
-        monkeypatch.setattr(opt, "PULP_AVAILABLE", orig)
 
 
 class TestOptimizeLabeledCuts:
@@ -112,3 +109,26 @@ class TestOptimizeLabeledCuts:
         plans, new_scraps = optimize_labeled_cuts([], 12.0)
         assert plans == []
         assert new_scraps == []
+
+    def test_integer_patterns_to_bins_covers_demand(self):
+        from logic.optimizer_cg import integer_patterns_to_bins
+        lengths = [4.0, 4.0, 4.0]
+        bins = integer_patterns_to_bins(lengths, [4000], [[3]], [1], 1000, 12.0)
+        assert len(bins) == 1
+        assert _counter(bins[0]) == _counter(lengths)
+
+    def test_integer_patterns_skips_overcoverage(self):
+        from logic.optimizer_cg import integer_patterns_to_bins
+        lengths = [4.0, 4.0]
+        bins = integer_patterns_to_bins(lengths, [4000], [[2], [2]], [1, 1], 1000, 12.0)
+        assert _counter(_flatten(bins)) == _counter(lengths)
+
+    def test_cg_not_worse_than_ffd(self):
+        from logic.optimizer_packing import _ffd_bins
+        pieces = [8.0, 5.0, 4.0, 4.0, 3.0, 3.0]
+        stock = 12.0
+        cg = optimize_cuts(pieces, stock)
+        ffd = _ffd_bins(pieces, stock)
+        assert _counter(_flatten(cg)) == _counter(pieces)
+        _assert_feasible(cg, stock)
+        assert len(cg) <= len(ffd)

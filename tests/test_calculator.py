@@ -82,3 +82,37 @@ class TestLapSplice:
         lap_high = calculate_lap_splice(16, fy=600, fc=25)
         lap_normal = calculate_lap_splice(16, fy=500, fc=25)
         assert lap_high > lap_normal
+
+
+class TestLapSpliceStandards:
+    def test_mabhas9_uses_size_factor(self):
+        aci = calculate_lap_splice(16, fy=400, fc=25, standard="ACI318")
+        ir = calculate_lap_splice(16, fy=400, fc=25, standard="MABHAS9")
+        assert ir >= 300
+        assert ir < aci
+
+    def test_iran_alias(self):
+        a = calculate_lap_splice(16, fy=400, fc=25, standard="ir")
+        b = calculate_lap_splice(16, fy=400, fc=25, standard="Mabhas 9")
+        assert a == pytest.approx(b)
+
+    def test_eurocode2_minimum(self):
+        lap = calculate_lap_splice(16, fy=500, fc=30, standard="EC2")
+        assert lap >= max(200.0, 15 * 16)
+
+    def test_simple_multiplier(self):
+        lap = calculate_lap_splice(16, fy=400, fc=25, standard="SIMPLE", simple_multiplier=40)
+        assert lap == pytest.approx(640.0)
+
+    def test_unknown_standard_falls_back_to_aci(self):
+        a = calculate_lap_splice(16, fy=500, fc=25, standard="ACI318")
+        b = calculate_lap_splice(16, fy=500, fc=25, standard="not-a-code")
+        assert a == pytest.approx(b)
+
+    def test_detailed_report_fields(self):
+        from logic.calculator import calculate_lap_splice_detailed
+        r = calculate_lap_splice_detailed(16, fy=400, fc=25, standard="MABHAS9")
+        assert r.standard == "MABHAS9"
+        assert r.lap_mm >= r.ld_mm
+        assert "psi_s" in r.factors
+        assert float(r) == pytest.approx(r.lap_mm)

@@ -200,7 +200,7 @@ class RebarModel:
             JOIN listofers l ON r.listofer_id = l.id
             WHERE l.project_id = ?
         """
-        if listofer_number and listofer_number != "-- Show All --":
+        if listofer_number and not config.is_all_listofer_filter(listofer_number):
             query += " AND l.number = ?"
             params.append(listofer_number)
         query += " ORDER BY l.number, r.pos"
@@ -214,16 +214,6 @@ class ScrapModel:
             grade = config.DEFAULT_REBAR_GRADE
         if date is None:
             date = datetime.datetime.now().isoformat()
-
-        existing = db.fetchone(
-            "SELECT id FROM scraps WHERE project_id = ? AND diameter = ? "
-            "AND length_mm = ? AND grade = ? "
-            "AND ((listofer_number = ?) OR (listofer_number IS NULL AND ? IS NULL)) "
-            "AND used = 0",
-            (project_id, diameter, length_mm, grade, listofer_number, listofer_number)
-        )
-        if existing:
-            return existing[0]
 
         return db.execute(
             "INSERT INTO scraps (project_id, diameter, length_mm, grade, date_created, used, listofer_number) "

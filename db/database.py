@@ -190,5 +190,18 @@ class DatabaseManager:
             self._local.connection.close()
             self._local.connection = None
 
+    @classmethod
+    def reset_instance(cls):
+        """Drop the singleton so tests can bind a temporary database."""
+        with cls._lock:
+            inst = cls._instance
+            if inst is not None:
+                try:
+                    inst.close()
+                except Exception:
+                    pass
+                inst._initialised = False
+            cls._instance = None
+
 
 db = DatabaseManager()

@@ -5,7 +5,7 @@ import json
 import logging
 from typing import Optional, Callable
 
-from config import STANDARD_STOCK_LENGTHS_M, DEFAULT_REBAR_GRADE
+from config import STANDARD_STOCK_LENGTHS_M, DEFAULT_REBAR_GRADE, FILTER_SHOW_ALL, is_all_listofer_filter
 from shapes.definitions import default_shape_registry
 from logic.calculator import calculate_weight
 from logic.optimizer import PULP_AVAILABLE
@@ -124,8 +124,8 @@ class BBSTreeview(ttk.LabelFrame):
         self.total_weight_label.config(text="Total Weight: 0.00 kg")
 
     def update_filter_list(self, numbers):
-        self.filter_combo['values'] = ["-- Show All --"] + numbers
-        self.filter_combo.set("-- Show All --")
+        self.filter_combo['values'] = [FILTER_SHOW_ALL] + list(numbers or [])
+        self.filter_combo.set(FILTER_SHOW_ALL)
 
     def load_data(self):
         project_id = self.controller.state.current_project_id
@@ -138,7 +138,7 @@ class BBSTreeview(ttk.LabelFrame):
             self.update_filter_list(numbers)
 
         filter_val = self.filter_combo.get()
-        number = None if filter_val in ("-- Show All --", "") else filter_val
+        number = None if is_all_listofer_filter(filter_val) else filter_val
 
         self.clear_tree()
 
@@ -384,7 +384,7 @@ class BBSTreeview(ttk.LabelFrame):
             messagebox.showwarning("Warning", "No data to optimize.")
             return
         filter_val = self.filter_combo.get()
-        listofer_filter = None if filter_val in ("-- Show All --", "") else filter_val
+        listofer_filter = None if is_all_listofer_filter(filter_val) else filter_val
         stock_len = float(self.stock_length.get())
         data_by_key = self.get_lengths_by_diameter_for_listofer(listofer_filter)
         if not data_by_key:

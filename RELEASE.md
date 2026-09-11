@@ -1,4 +1,4 @@
-# RebarAgent v1.6.0 – Final Release Notes
+# RebarAgent v1.6.1 – Release Notes
 
 ## Product
 Offline desktop **Bar Bending Schedule (BBS)** + **1D cutting optimization** for detailers and site engineers.
@@ -9,10 +9,12 @@ Offline desktop **Bar Bending Schedule (BBS)** + **1D cutting optimization** for
 
 ## What is included
 - Multi-standard shape library (BS, ACI, EC2, Mabhas 9, …)
-- Cutting optimizer: multi-stock lengths, kerf, min usable scrap, utilization metrics
+- Cutting optimizer: multi-stock lengths, kerf, min usable scrap; CG integer solution is used
 - Smart inventory: Scrap Bank + Stock Manager; Confirm Plan + reversible ledger
+- Lap splice: Mabhas 9 / Eurocode 2 / ACI 318
+- Excel import with Persian headers
 - Agent brain: health score, Insights, coach tips
-- Sample project, Excel import/template, savings report
+- Sample project with bent shapes, Excel template, savings report
 - Exports: Excel, PDF, HTML, BVBS
 - Modular codebase (`logic/` + `ui/` split for maintainability)
 
@@ -34,8 +36,8 @@ python build_exe.py
 ```
 
 ## Pre-ship checklist
-- [x] `pytest tests/ -q` → **32 passed**
-- [x] APP_VERSION / pyproject = **1.6.0**
+- [x] `pytest tests/ -q`
+- [x] APP_VERSION / pyproject = **1.6.1**
 - [x] WhatsApp sales number in config
 - [ ] Manual smoke on Windows: Sample → Cutting → Confirm → Export
 - [ ] Generate trial/pro keys with `generate_license.py`

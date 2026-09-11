@@ -284,7 +284,7 @@ class SettingsWindow(tk.Toplevel):
             cursor = conn.cursor()
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='projects'")
             if not cursor.fetchone():
-                messagebox.showerror("Invalid Database", "The file is not a valid AiRebar database.")
+                messagebox.showerror("Invalid Database", "The file is not a valid RebarAgent database.")
                 conn.close()
                 return False
             conn.close()

@@ -146,12 +146,42 @@ def run_doctor(project_id: Optional[int] = None) -> DoctorReport:
     report.checks.append(_check("event_bus", _events))
 
     def _backup_api():
-        from utils import project_backup as pb
-        assert callable(getattr(pb, "backup_full_database", None))
-        assert callable(getattr(pb, "export_project_json", None))
-        return "backup_full_database + export_project_json"
+        from utils.project_backup import export_project_json, save_project_backup
+        from utils.backup_db import backup_full_database
+        assert callable(export_project_json)
+        assert callable(save_project_backup)
+        assert callable(backup_full_database)
+        return "export_project_json + save_project_backup + backup_full_database"
 
     report.checks.append(_check("backup_api", _backup_api, level_on_fail="warning"))
+
+    def _optimizer():
+        from logic.optimizer import optimize_cuts, PULP_AVAILABLE, MIP_AVAILABLE
+        bins = optimize_cuts([4.0, 4.0, 4.0], 12.0)
+        if not bins:
+            raise RuntimeError("optimize_cuts returned empty for a feasible instance")
+        if any(sum(b) > 12.0 + 1e-6 for b in bins):
+            raise RuntimeError("infeasible packing")
+        packed = [x for b in bins for x in b]
+        if len(packed) != 3:
+            raise RuntimeError(f"lost pieces: {packed}")
+        return f"bars={len(bins)} pulp={PULP_AVAILABLE} mip={MIP_AVAILABLE}"
+
+    report.checks.append(_check("optimizer", _optimizer))
+
+    def _excel_import():
+        from utils.excel_import import _map_columns, normalize_standard, _shape_dimensions
+        mapped = _map_columns(["قطر", "تعداد", "شکل", "طول"])
+        if "diameter" not in mapped or "quantity" not in mapped:
+            raise RuntimeError(f"Persian columns not mapped: {mapped}")
+        if normalize_standard("mabhas9") != "ir":
+            raise RuntimeError("standard alias failed")
+        dims = _shape_dimensions("00", {"A": 1200})
+        if dims.get("L") != 1200:
+            raise RuntimeError("straight bar A→L mapping failed")
+        return f"mapped={sorted(mapped)}"
+
+    report.checks.append(_check("excel_import", _excel_import))
 
     if project_id is not None:
         def _project():

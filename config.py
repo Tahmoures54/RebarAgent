@@ -5,7 +5,7 @@ import os
 import json
 
 APP_NAME = "RebarAgent"
-APP_VERSION = "1.6.0"
+APP_VERSION = "1.6.1"
 
 from enum import Enum
 
@@ -120,6 +120,23 @@ EXPORT_DATE_FORMAT = "%Y-%m-%d"
 EXPORT_FILE_PREFIX = "BBS_Report"
 COMPANY_INFO = {"name": "Sample Construction Co.", "logo": "", "engineer": "Engineering Department", "website": "www.sample-construction.com", "phone": "+1 (555) 123-4567"}
 FILTER_SHOW_ALL = "-- Show All --"
+FILTER_SHOW_ALL_SENTINELS = frozenset({
+    "-- Show All --",
+    "-- نمایش همه --",
+    "-- All --",
+})
+VERSION = APP_VERSION
+
+
+def is_all_listofer_filter(value) -> bool:
+    if value is None:
+        return True
+    text = str(value).strip()
+    if not text:
+        return True
+    if text in FILTER_SHOW_ALL_SENTINELS:
+        return True
+    return text == FILTER_SHOW_ALL
 
 MENU_LABELS = {
     "file": "File", "new_project": "New Project...", "open_project": "Open Project...", "project_manager": "Project Manager...",

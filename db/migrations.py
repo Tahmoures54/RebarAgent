@@ -126,17 +126,5 @@ def run_migrations(conn: sqlite3.Connection) -> int:
             except Exception:
                 pass
             logger.error("Migration v%s failed: %s", target, e, exc_info=True)
-            try:
-                set_schema_version(conn, target)
-                conn.commit()
-                current = target
-            except Exception:
-                pass
-    if current < SCHEMA_VERSION:
-        try:
-            set_schema_version(conn, SCHEMA_VERSION)
-            conn.commit()
-            current = SCHEMA_VERSION
-        except Exception:
-            pass
+            break
     return current

@@ -199,11 +199,8 @@ def _consume_stock_bar(project_id, diameter, length_mm, quantity, grade=None) ->
 
 
 def _parse_stock_row(r):
-    try:
-        # (id, project_id, diameter, length, quantity, grade?)
-        return int(r[0]), float(r[3]), int(r[4] or 0)
-    except Exception:
-        return None
+    from logic.inventory_core import _parse_stock_row as _core_parse
+    return _core_parse(r)
 
 
 def _restore_stock_bar(project_id, diameter, length_mm, quantity, grade=None) -> bool:
