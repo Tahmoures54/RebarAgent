@@ -208,7 +208,7 @@ class AgentInsightsDialog(tk.Toplevel):
             recs.append("• Run «Cutting Plan (All)» after updating stock and scraps for the best waste reduction.\n")
             recs.append("• Use the Scrap Manager regularly – the optimizer prioritizes existing off-cuts before cutting new stock bars.\n")
         recs.append("\n" + "─" * 48)
-        recs.append("\nThese suggestions are rule-based heuristics. Always verify against site conditions and design drawings.")
+        recs.append("\nCopilot is local and explainable (project rules + cutting optimizer). Always check drawings.")
         dia_rows = []
         for dia in sorted(by_dia.keys()):
             info = by_dia[dia]

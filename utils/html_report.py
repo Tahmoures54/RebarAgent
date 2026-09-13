@@ -14,10 +14,11 @@ import json
 import html as html_mod
 import sqlite3
 
-from config import WEIGHT_COEFFICIENT, DEFAULT_REBAR_GRADE, DB_PATH
+from config import WEIGHT_COEFFICIENT, DEFAULT_REBAR_GRADE, DB_PATH, APP_NAME
 from shapes.definitions import default_shape_registry
 from shapes.svg_render import generate_shape_svg
 from db.models import RebarModel
+from utils.report_brand import page_css, footer_html, copilot_strip_html, BRAND
 
 import qrcode
 from qrcode.image.svg import SvgPathImage
@@ -148,128 +149,16 @@ def generate_html_report(project_id, project_name, client_name="",
     # ------------------------------------------------------------------
     # CSS – on‑screen A4‑like page + perfect print
     # ------------------------------------------------------------------
-    css = """
+    css = page_css() + """
     <style>
-    @page { size: A4; margin: 12mm 15mm 12mm 15mm; }
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body {
-        font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
-        background: #e2e8f0;
-        color: #1e293b;
-        line-height: 1.5;
-        display: flex;
-        justify-content: center;
-        align-items: flex-start;
-        min-height: 100vh;
-        padding: 20px;
-    }
-    .page {
-        max-width: 210mm;
-        width: 100%;
-        background: #ffffff;
-        padding: 15mm 15mm 15mm 15mm;
-        box-shadow: 0 0 20px rgba(0,0,0,0.1);
-        border-radius: 4px;
-        margin-bottom: 30px;
-    }
-    .report-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 10px 0 15px;
-        border-bottom: 3px solid #1e3a8a;
-        margin-bottom: 20px;
-    }
-    .header-left { display: flex; align-items: center; gap: 15px; }
-    .company-logo { width: 55px; height: 55px; }
-    .header-text { display: flex; flex-direction: column; }
-    .company-name { font-size: 24px; font-weight: 700; color: #1e3a8a; line-height: 1.2; }
-    .header-title { font-size: 18px; font-weight: 600; color: #334155; margin-top: 2px; }
-    .header-subtitle { font-size: 13px; color: #64748b; font-weight: 500; }
-    .header-right { text-align: center; }
-    .qr-code { width: 60px; height: 60px; margin: 0 auto 4px; }
-    .qr-code svg { width: 100%; height: 100%; display: block; }  
-    .header-right p { font-size: 10px; color: #475569; }
-
-    .project-info {
-        background: #f8fafc; border-radius: 8px; padding: 15px 20px;
-        margin-bottom: 25px; display: flex; justify-content: space-between;
-        flex-wrap: wrap; border: 1px solid #e2e8f0;
-    }
-    .project-info p { margin: 4px 0; font-size: 14px; }
-    .project-info .label { font-weight: 600; color: #475569; }
-
-    .listofer-section {
-        margin-top: 30px;
-        page-break-before: always;
-    }
-    .listofer-section:first-of-type { page-break-before: auto; }
-    .listofer-section h2 {
-        color: #1e3a8a; font-size: 20px; border-left: 5px solid #1e3a8a;
-        padding-left: 12px; margin-bottom: 8px;
-    }
-    .listofer-desc { font-size: 14px; color: #475569; margin-bottom: 12px; }
-
-    table { width: 100%; border-collapse: collapse; font-size: 11.5px; margin: 15px 0; }
-    thead { display: table-header-group; }
-    th {
-        background: #1e3a8a; color: #ffffff; padding: 10px 5px;
-        font-weight: 600; text-align: center; font-size: 11px; white-space: nowrap;
-    }
-    td {
-        padding: 7px 5px; border-bottom: 1px solid #e2e8f0;
-        text-align: center; vertical-align: middle;
-    }
-    tr:nth-child(even) { background-color: #f8fafc; }
-    tr:hover { background-color: #e0e7ff; }
-
+    .listofer-section { margin-top: 28px; }
+    .listofer-section h2 { color: #134e4a; font-size: 18px; border-left: 5px solid #0f766e; padding-left: 10px; margin-bottom: 8px; }
     .svg-container { width: 160px; height: 100px; display: flex; align-items: center; justify-content: center; margin: 0 auto; }
-    .shape-name { font-size: 8px; color: #64748b; margin-top: 3px; text-align: center; }
-
+    .shape-name { font-size: 8px; color: #64748b; margin-top: 3px; }
     .source-stock { color: #166534; font-weight: bold; }
     .source-scrap { color: #b45309; font-weight: bold; }
     .source-unknown { color: #94a3b8; }
-
-    .summary-grid {
-        display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-        gap: 15px; margin: 25px 0;
-    }
-    .summary-card {
-        background: #f1f5f9; border-radius: 10px; padding: 18px 15px; border: 1px solid #e2e8f0;
-    }
-    .summary-card .value { font-size: 28px; font-weight: 700; color: #1e3a8a; margin: 5px 0 0; }
-    .summary-card .label { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; }
-
-    .breakdown-table { width: 100%; max-width: 600px; margin: 20px auto; }
-
-    .signatures {
-        margin-top: 40px; padding-top: 25px; border-top: 2px solid #1e3a8a;
-        display: flex; justify-content: space-between; page-break-inside: avoid;
-    }
-    .signature-box { width: 45%; text-align: center; }
-    .signature-line { margin: 45px 0 8px; border-bottom: 1px solid #334155; }
-    .signature-label { font-size: 13px; font-weight: 600; color: #1e3a8a; }
-
-    .brand-footer {
-        margin-top: 35px; padding-top: 20px; border-top: 2px solid #cbd5e1;
-        display: flex; justify-content: space-between; align-items: center;
-        font-size: 12px; color: #475569; page-break-inside: avoid;
-    }
-    .brand-footer .brand-message { font-weight: 600; color: #1e3a8a; font-size: 13px; }
-    .brand-footer .contact-links a { color: #1e3a8a; text-decoration: none; font-weight: 600; margin-left: 15px; }
-    .brand-footer .contact-links a:hover { text-decoration: underline; }
-
-    @media print {
-        body { background: white; padding: 0; display: block; }
-        .page { box-shadow: none; border-radius: 0; margin: 0; padding: 0; max-width: none; }
-        .report-header { border-bottom-width: 2px; }
-        .project-info, .summary-card { box-shadow: none; border: 1px solid #cbd5e1; }
-        .listofer-section { page-break-before: always; }
-        .listofer-section:first-of-type { page-break-before: auto; }
-        table { font-size: 10px; }
-        th, td { padding: 6px 4px; }
-        .svg-container { width: 140px; height: 90px; }
-    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
     </style>
     """
 
@@ -312,6 +201,14 @@ def generate_html_report(project_id, project_name, client_name="",
     </div>
 </div>
 """
+    try:
+        from logic.agent_brain import analyze_project
+        from utils.i18n import get_language
+        rep = analyze_project(project_id)
+        html += copilot_strip_html(rep.health_score, rep.headline, get_language())
+    except Exception:
+        html += copilot_strip_html(None, BRAND["tagline_en"])
+
 
     # ... rest of report generation (identical to previous version, omitted for brevity) ...
     # The full function continues with the same aggregation and table code.
@@ -464,19 +361,13 @@ def generate_html_report(project_id, project_name, client_name="",
     </div>
     """
 
-    safe_company = html_mod.escape(COMPANY_INFO['name'])
-    safe_web = html_mod.escape(COMPANY_INFO['website'])
-    html += f"""
-    <div class="brand-footer">
-        <div class="brand-message">
-            🚀 Generated with <strong>{safe_company}</strong> — Smart Bar Bending Schedules, Zero Errors.
-        </div>
-        <div class="contact-links">
-            <a href="{WHATSAPP_LINK}">💬 WhatsApp</a>
-            <a href="{safe_web}">🌐 {safe_web}</a>
-        </div>
-    </div>
-
+    try:
+        from utils.i18n import get_language
+        lang = get_language()
+    except Exception:
+        lang = "en"
+    html += footer_html(lang)
+    html += """
 </div><!-- end .page -->
 </body></html>
     """

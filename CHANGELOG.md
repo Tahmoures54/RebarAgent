@@ -1,5 +1,13 @@
 # RebarAgent Changelog
 
+## [1.7.0] – 2026-09-13 (Release: Copilot + self-serve checkout)
+- **.env.example** in the repo root: wallet, worker URL, Telegram bot, and plan prices
+- Plan USD/IRR prices and USDT address load from environment (no rebuild)
+- **Copilot** on the main KPI strip: real health score + next action (fixes broken AgentBrain hook)
+- Cutting Plan shows leftover / 6 m vs 12 m coaching before Confirm
+- Duplicate marks and naïve-12 m leftover estimated in Insights
+- HTML BBS + cutting reports restyled; RebarAgent advertisement in the print footer (WhatsApp / worker link)
+
 ## [1.6.2] – 2026-09-13 (Self-serve USDT checkout)
 - License dialog activates automatically after a matching **USDT TRC20** payment (exact unique amount per machine+plan)
 - Optional Telegram bot (`tools/usdt_license_bot.py`) issues the same keys without WhatsApp

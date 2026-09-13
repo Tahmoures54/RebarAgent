@@ -166,6 +166,60 @@ def analyze_project(project_id: int) -> AgentReport:
             stats["dominant_diameter"] = top_dia[0]
             stats["dominant_length_m"] = top_dia[1]["len_m"]
 
+        # Duplicate marks confuse the cutting crew — Excel listofer tools never catch this.
+        seen = {}
+        dup = 0
+        for row in rows:
+            try:
+                key = (str(row[1]), str(row[3]), round(float(row[4]), 1))
+            except Exception:
+                continue
+            if key in seen:
+                dup += 1
+            seen[key] = True
+        stats["duplicate_marks"] = dup
+        if dup:
+            fa = _is_fa()
+            actions.append(AgentAction(
+                2, "dup_marks",
+                "علامت پوز تکراری" if fa else "Duplicate position marks",
+                f"{dup} پوز با همان لیستوفر/قطر تکرار شده. قبل از چاپ یکی را اصلاح کنید." if fa
+                else f"{dup} row(s) share listofer + mark + diameter. Fix before printing — the crew will cut twice.",
+                "add_pos", "warn",
+            ))
+
+        if lengths_m:
+            short_ratio = sum(1 for L in lengths_m if L < 5.6) / max(1, len(lengths_m))
+            if short_ratio >= 0.7:
+                fa = _is_fa()
+                actions.append(AgentAction(
+                    4, "prefer_6m",
+                    "موجودی ۶ متری را هم بگذارید" if fa else "Add 6 m stock as well",
+                    "بیشتر قطعات کوتاه‌تر از ۶ مترند. فقط ۱۲ متری پرت را بالا می‌برد." if fa
+                    else "Most pieces are under 6 m. 12 m-only stock usually wastes the tail. Put 6 m bars in Stock and re-run.",
+                    "stock", "info",
+                ))
+            # Naive 12 m packing leftover ≈ money the Excel workflow never shows
+            pack = 0.0
+            bars12 = 0
+            for L in sorted(lengths_m, reverse=True):
+                if pack + L <= 12.0 + 1e-6:
+                    pack += L
+                else:
+                    bars12 += 1
+                    pack = L
+            if pack:
+                bars12 += 1
+            leftover = max(0.0, bars12 * 12.0 - sum(lengths_m))
+            stats["naive_12m_bars"] = bars12
+            stats["naive_leftover_m"] = leftover
+            if leftover >= 8:
+                fa = _is_fa()
+                waste_hints.append(
+                    f"اگر بدون بهینه‌ساز و فقط با ۱۲ متری ببرید حدود {leftover:.0f} متر ته می‌ماند." if fa
+                    else f"A naïve 12 m cut would leave ~{leftover:.0f} m on the floor — run Cutting Plan before you buy."
+                )
+
     score = 100
     if not rows:
         score = 15
@@ -208,3 +262,38 @@ def format_agent_report(report: AgentReport) -> str:
     st = report.stats
     lines.extend(["", f"Stats: {st.get('line_count', 0)} lines · {st.get('piece_count', 0)} pieces · {st.get('total_length_m', 0):.1f} m · scraps {st.get('scrap_pieces', 0)}"])
     return "\n".join(lines)
+
+
+def _is_fa() -> bool:
+    try:
+        from utils.i18n import get_language
+        return get_language() == "fa"
+    except Exception:
+        return False
+
+
+class AgentBrain:
+    """Facade used by the main shell. Local, explainable copilot — not a chat model."""
+
+    def __init__(self, project_id: int):
+        self.project_id = project_id
+        self._report: Optional[AgentReport] = None
+
+    def analyze(self) -> AgentReport:
+        self._report = analyze_project(self.project_id)
+        try:
+            from utils.ai_copy import maybe_enrich_report
+            maybe_enrich_report(self._report)
+        except Exception:
+            pass
+        return self._report
+
+    def health_score(self) -> float:
+        if self._report is None:
+            self.analyze()
+        return float(self._report.health_score)
+
+    def top_tip(self) -> str:
+        if self._report is None:
+            self.analyze()
+        return self._report.top_tip()

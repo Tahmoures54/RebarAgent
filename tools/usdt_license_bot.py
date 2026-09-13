@@ -24,6 +24,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+from utils.envfile import load_env_file
+load_env_file(os.path.join(ROOT, ".env"))
+
 from utils.license import generate_activation_key, PLAN_SKU_TO_LICENSE_TYPE
 from utils.usdt_payment import (
     build_invoice,

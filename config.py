@@ -4,8 +4,12 @@
 import os
 import json
 
+from utils.envfile import load_project_env
+
+load_project_env()
+
 APP_NAME = "RebarAgent"
-APP_VERSION = "1.6.2"
+APP_VERSION = "1.7.0"
 
 from enum import Enum
 
@@ -42,6 +46,22 @@ TRIAL_PERIOD_DAYS = 14
 MAX_TRIAL_RECORDS = 80
 MAX_TRIAL_PROJECTS = 2
 
+
+def _env_str(key: str, default: str = "") -> str:
+    val = os.environ.get(key, "")
+    return val.strip() if isinstance(val, str) and val.strip() else default
+
+
+def _env_int(key: str, default: int) -> int:
+    raw = _env_str(key, "")
+    if not raw:
+        return default
+    try:
+        return int(float(raw.replace(",", "").replace("_", "")))
+    except ValueError:
+        return default
+
+
 REVENUE_PLANS = {
     "trial": {
         "code": "trial", "name_en": "Trial", "name_fa": "آزمایشی", "days": 14,
@@ -53,9 +73,12 @@ REVENUE_PLANS = {
     "pro": {
         "code": "pro", "name_en": "Pro", "name_fa": "حرفه‌ای",
         "durations": {
-            "pro_3m": {"days": 90, "price_irr": 2_900_000, "price_usd": 49},
-            "pro_6m": {"days": 180, "price_irr": 4_900_000, "price_usd": 79},
-            "pro_1y": {"days": 365, "price_irr": 7_900_000, "price_usd": 129},
+            "pro_3m": {"days": 90, "price_irr": _env_int("REBARAGENT_PRICE_PRO_3M_IRR", 2_900_000),
+                       "price_usd": _env_int("REBARAGENT_PRICE_PRO_3M_USD", 49)},
+            "pro_6m": {"days": 180, "price_irr": _env_int("REBARAGENT_PRICE_PRO_6M_IRR", 4_900_000),
+                       "price_usd": _env_int("REBARAGENT_PRICE_PRO_6M_USD", 79)},
+            "pro_1y": {"days": 365, "price_irr": _env_int("REBARAGENT_PRICE_PRO_1Y_IRR", 7_900_000),
+                       "price_usd": _env_int("REBARAGENT_PRICE_PRO_1Y_USD", 129)},
         },
         "max_records": None, "max_projects": None,
         "features": {"export_excel": True, "export_pdf": True, "export_html": True, "export_bvbs": True,
@@ -64,7 +87,8 @@ REVENUE_PLANS = {
     },
     "office": {
         "code": "office", "name_en": "Office", "name_fa": "دفتری",
-        "durations": {"office_1y": {"days": 365, "price_irr": 14_900_000, "price_usd": 249}},
+        "durations": {"office_1y": {"days": 365, "price_irr": _env_int("REBARAGENT_PRICE_OFFICE_1Y_IRR", 14_900_000),
+                                    "price_usd": _env_int("REBARAGENT_PRICE_OFFICE_1Y_USD", 249)}},
         "max_records": None, "max_projects": None, "seats": 3,
         "features": {"export_excel": True, "export_pdf": True, "export_html": True, "export_bvbs": True,
             "cutting_plan": True, "agent_insights": True, "scrap_bank": True, "stock_manager": True,
@@ -72,7 +96,8 @@ REVENUE_PLANS = {
     },
     "unlimited": {
         "code": "unlimited", "name_en": "Lifetime", "name_fa": "مادام‌العمر",
-        "durations": {"unlimited": {"days": None, "price_irr": 24_900_000, "price_usd": 399}},
+        "durations": {"unlimited": {"days": None, "price_irr": _env_int("REBARAGENT_PRICE_UNLIMITED_IRR", 24_900_000),
+                                    "price_usd": _env_int("REBARAGENT_PRICE_UNLIMITED_USD", 399)}},
         "max_records": None, "max_projects": None,
         "features": {"export_excel": True, "export_pdf": True, "export_html": True, "export_bvbs": True,
             "cutting_plan": True, "agent_insights": True, "scrap_bank": True, "stock_manager": True,
@@ -86,17 +111,18 @@ LICENSE_TYPE_ALIASES = {
 }
 
 PURCHASE_CONTACT = {
-    "whatsapp": "+989160684552",
-    "whatsapp_digits": "989160684552",
-    "telegram": "@RebarAgent",
+    "whatsapp": _env_str("REBARAGENT_WHATSAPP", "+989160684552"),
+    "whatsapp_digits": "".join(ch for ch in _env_str("REBARAGENT_WHATSAPP", "+989160684552") if ch.isdigit()),
+    "telegram": _env_str("REBARAGENT_TELEGRAM", "@RebarAgent"),
+    "worker_url": _env_str("REBARAGENT_WORKER_URL", ""),
+    "website": _env_str("REBARAGENT_WEBSITE", "https://github.com/Tahmoures54/RebarAgent"),
     "email": "license@rebaragent.local",
     "note_en": "Pay USDT (TRC20) in License Management — the app activates itself. WhatsApp is only for problems.",
     "note_fa": "در مدیریت لایسنس تتر (TRC20) بپردازید؛ برنامه خودش فعال می‌شود. واتساپ فقط برای مشکل است.",
 }
 
-# Self-serve USDT checkout (TRC20). Leave empty until you set a receive wallet.
-# Override without rebuild: env REBARAGENT_USDT_TRC20, or payment.json next to the app / in the license dir.
-USDT_TRC20_ADDRESS = os.environ.get("REBARAGENT_USDT_TRC20", "").strip()
+# Self-serve USDT checkout (TRC20). Set REBARAGENT_USDT_TRC20 in .env
+USDT_TRC20_ADDRESS = _env_str("REBARAGENT_USDT_TRC20", "")
 USDT_TRC20_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
 USDT_PAYMENT_NETWORK = "TRC20"
 USDT_PAYMENT_MAX_AGE_SEC = 7 * 24 * 3600

@@ -9,7 +9,7 @@ from tkinter import ttk
 try:
     from config import APP_VERSION, APP_NAME
 except ImportError:
-    APP_VERSION = "1.6.2"
+    APP_VERSION = "1.7.0"
     APP_NAME = "RebarAgent"
 
 _TITLE_FONT = ("Segoe UI", 28, "bold")

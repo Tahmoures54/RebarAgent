@@ -300,6 +300,9 @@ class LicenseDialog(tk.Toplevel):
         )
         wa.pack(anchor="w")
         wa.bind("<Button-1>", lambda _e: webbrowser.open(f"https://wa.me/{PURCHASE_CONTACT['whatsapp_digits']}"))
+        worker = (PURCHASE_CONTACT.get("worker_url") or "").strip()
+        if worker:
+            tk.Label(main, text=worker, font=("Arial", 9), fg="#2563eb", bg=self.bg, cursor="hand2").pack(anchor="w")
 
     def _refresh_invoice(self):
         if not hasattr(self, "_addr_var"):

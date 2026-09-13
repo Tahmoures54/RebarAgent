@@ -131,9 +131,8 @@ class MainWindowShellMixin:
             AgentInsightsDialog(self, self.app.state.current_project_id)
         except Exception:
             try:
-                from logic.agent_brain import AgentBrain
-                brain = AgentBrain(self.app.state.current_project_id)
-                report = brain.analyze() if hasattr(brain, "analyze") else str(brain)
+                from logic.agent_brain import analyze_project, format_agent_report
+                report = format_agent_report(analyze_project(self.app.state.current_project_id))
                 messagebox.showinfo("Agent insights", str(report)[:2000])
             except Exception as e:
                 messagebox.showinfo("Agent insights", f"Insights unavailable:\n{e}")
@@ -170,13 +169,13 @@ class MainWindowShellMixin:
             except Exception:
                 pass
             health = "—"
+            tip = None
             try:
                 from logic.agent_brain import AgentBrain
                 brain = AgentBrain(pid)
-                if hasattr(brain, "health_score"):
-                    health = f"{brain.health_score():.0f}%"
-                elif hasattr(brain, "score"):
-                    health = str(brain.score)
+                rep = brain.analyze()
+                health = f"{rep.health_score}/100"
+                tip = rep.top_tip()
             except Exception:
                 pass
             self.kpi_strip.update_metrics(
@@ -188,6 +187,8 @@ class MainWindowShellMixin:
             )
             if getattr(self, "coach", None):
                 self.coach.set_context(True, n_pos > 0, stock_n not in (0, "—"))
+                if tip and n_pos > 0:
+                    self.coach.set_tip(tip)
         except Exception as e:
             logger.debug("KPI refresh: %s", e)
 

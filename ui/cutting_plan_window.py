@@ -54,6 +54,8 @@ class CuttingPlanWindow(tk.Toplevel):
         ttk.Button(top, text="Export HTML", command=self.export_html).pack(side=tk.LEFT, padx=4)
         ttk.Button(top, text="Close", command=self.destroy).pack(side=tk.RIGHT, padx=4)
         ttk.Label(top, textvariable=self.summary_var).pack(side=tk.LEFT, padx=12)
+        self.coach_var = tk.StringVar(value="")
+        ttk.Label(self, textvariable=self.coach_var, wraplength=920, foreground="#0f766e").pack(fill=tk.X, padx=12, pady=(0, 4))
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
         self.progress = ttk.Progressbar(self, mode="determinate")
@@ -181,6 +183,13 @@ class CuttingPlanWindow(tk.Toplevel):
             if new_scraps:
                 tree.insert("", tk.END, values=("-", f"offcuts: {new_scraps}", "", "", ""))
         self.summary_var.set(f"Status: {self.plan_status}  |  bars: {n_bars}  |  waste: {total_waste:.2f} m")
+        try:
+            from logic.cutting_coach import coach_from_plan_groups
+            from utils.i18n import get_language
+            tips = coach_from_plan_groups(self.plans_per_group, self.stock_len, lang=get_language())
+            self.coach_var.set("  ·  ".join(tips))
+        except Exception:
+            self.coach_var.set("")
 
     def confirm_plan(self):
         if self.plan_status == "confirmed":
