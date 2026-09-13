@@ -33,6 +33,7 @@ logger = setup_logger("RebarAgent.USDT")
 USDT_DECIMALS = 6
 MICROS_PER_CENT = 10_000  # 0.01 USDT with 6 on-chain decimals
 TRON_ADDRESS_RE = re.compile(r"^T[1-9A-HJ-NP-Za-km-z]{33}$")
+_B58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 PAYMENT_JSON_NAMES = ("payment.json",)
 
 # sku -> signed license type (see utils.license.PLAN_SKU_TO_LICENSE_TYPE)
@@ -80,8 +81,35 @@ class Transfer:
     symbol: str = ""
 
 
+def _b58decode(value: str) -> bytes:
+    num = 0
+    for char in value:
+        num = num * 58 + _B58_ALPHABET.index(char)
+    combined = num.to_bytes((num.bit_length() + 7) // 8 or 1, "big")
+    pad = 0
+    for char in value:
+        if char != "1":
+            break
+        pad += 1
+    return b"\x00" * pad + combined
+
+
 def is_valid_tron_address(address: str) -> bool:
-    return bool(address and TRON_ADDRESS_RE.match(address.strip()))
+    """Length/charset plus base58check (Tron mainnet prefix 0x41)."""
+    text = (address or "").strip()
+    if not TRON_ADDRESS_RE.match(text):
+        return False
+    try:
+        raw = _b58decode(text)
+    except (ValueError, IndexError):
+        return False
+    if len(raw) < 25:
+        raw = raw.rjust(25, b"\x00")
+    if len(raw) != 25 or raw[0] != 0x41:
+        return False
+    payload, checksum = raw[:21], raw[21:]
+    digest = hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4]
+    return digest == checksum
 
 
 def _read_json_address(path: str) -> str:
@@ -153,7 +181,12 @@ def get_checkout_plan(sku: str) -> Optional[CheckoutPlan]:
 
 
 def unique_suffix_cents(machine_id: str, sku: str) -> int:
-    """Stable 10–99 cents so each machine+plan has a distinct on-chain amount."""
+    """Stable 10–99 cents so each machine+plan has a distinct on-chain amount.
+
+    Two-decimal amounts stay paste-friendly in wallets. Collisions between
+    different machines on the same SKU are possible (~1/90); acceptable at
+    low volume because there is no shared backend.
+    """
     digest = hashlib.sha256(f"{machine_id}|{sku}".encode("utf-8")).digest()
     return 10 + (int.from_bytes(digest[:2], "big") % 90)
 
@@ -294,7 +327,8 @@ def fetch_incoming_usdt(
         raise ValueError("Invalid TRON receive address")
     url = (
         f"{TRONGRID_API_URL.rstrip('/')}/v1/accounts/{address}/transactions/trc20"
-        f"?only_to=true&limit={int(limit)}&contract_address={USDT_TRC20_CONTRACT}"
+        f"?only_to=true&only_confirmed=true&limit={int(limit)}"
+        f"&contract_address={USDT_TRC20_CONTRACT}"
     )
     req = urllib.request.Request(
         url,
@@ -310,6 +344,13 @@ def fetch_incoming_usdt(
     try:
         with fetch(req, timeout=timeout) as resp:
             raw = resp.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        body = ""
+        try:
+            body = exc.read().decode("utf-8", errors="replace")[:180]
+        except Exception:
+            body = ""
+        raise RuntimeError(f"TronGrid HTTP {exc.code}: {body or exc.reason}") from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(f"Could not reach TronGrid: {exc}") from exc
     try:

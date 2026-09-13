@@ -10,6 +10,7 @@ from utils.usdt_payment import (
     build_invoice,
     expected_amount_micros,
     fulfill_paid_plan,
+    fetch_incoming_usdt,
     list_checkout_plans,
     match_payment,
     parse_trc20_transfers,
@@ -17,13 +18,21 @@ from utils.usdt_payment import (
 )
 
 
-RECEIVE = "TXYZabcdefghjkmnpqrstuvwxyzzzzzzzz"
+RECEIVE = "TMuA6YqfCeX8EhbfYEg5y7S4DqzSJireY9"
 
 
 def _patch_license_store(monkeypatch, tmp_path):
     monkeypatch.setattr("utils.license.HIDDEN_DIR", str(tmp_path))
     monkeypatch.setattr("utils.license.HIDDEN_FILE", str(tmp_path / "license.dat"))
     monkeypatch.setattr("utils.usdt_payment.HIDDEN_LICENSE_DIR", str(tmp_path))
+
+
+def test_tron_address_checksum():
+    from utils.usdt_payment import is_valid_tron_address
+    assert is_valid_tron_address("TMuA6YqfCeX8EhbfYEg5y7S4DqzSJireY9")
+    assert not is_valid_tron_address("TXYZabcdefghjkmnpqrstuvwxyzzzzzzzz")
+    assert not is_valid_tron_address("")
+    assert not is_valid_tron_address("0xabc")
 
 
 def test_checkout_plans_exclude_trial():
@@ -106,6 +115,31 @@ def test_match_payment_requires_exact_usdt_amount_and_freshness():
         now_ms=now,
         txid="nope",
     ) is None
+
+
+def test_fetch_requests_confirmed_usdt_only():
+    captured = {}
+
+    def fake_open(req, timeout=20):
+        captured["url"] = req.full_url
+
+        class _Resp:
+            def read(self):
+                return b'{"data":[]}'
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        return _Resp()
+
+    rows = fetch_incoming_usdt(RECEIVE, opener=fake_open)
+    assert rows == []
+    assert "only_confirmed=true" in captured["url"]
+    assert "only_to=true" in captured["url"]
+    assert USDT_TRC20_CONTRACT in captured["url"]
 
 
 def test_parse_trongrid_payload():
@@ -201,3 +235,26 @@ def test_issue_and_activate_unknown_plan(isolated_db):
     assert not ok
     assert key is None
     assert "Unknown" in msg
+
+
+def test_license_dialog_builds_on_plain_tk(isolated_db, tmp_path, monkeypatch):
+    import os
+    import tkinter as tk
+    from ui.license_dialog import LicenseDialog
+
+    if not os.environ.get("DISPLAY") and os.name != "nt":
+        import pytest
+        pytest.skip("no display")
+    monkeypatch.setenv("REBARAGENT_USDT_TRC20", "TMuA6YqfCeX8EhbfYEg5y7S4DqzSJireY9")
+    monkeypatch.setattr("utils.license.HIDDEN_DIR", str(tmp_path))
+    monkeypatch.setattr("utils.license.HIDDEN_FILE", str(tmp_path / "license.dat"))
+    root = tk.Tk()
+    root.withdraw()
+    try:
+        dlg = LicenseDialog(root, isolated_db)
+        dlg.update_idletasks()
+        assert dlg.winfo_exists()
+        assert "129." in dlg._amt_var.get() or "49." in dlg._amt_var.get()
+        dlg.destroy()
+    finally:
+        root.destroy()

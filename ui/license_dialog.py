@@ -29,10 +29,11 @@ class LicenseDialog(tk.Toplevel):
         self.callback = callback
         self._busy = False
 
-        if hasattr(master, "state"):
-            theme = master.state.theme
-        else:
+        state_obj = getattr(master, "state", None)
+        if callable(state_obj) or state_obj is None:
             theme = AppTheme.TURQUOISE
+        else:
+            theme = getattr(state_obj, "theme", AppTheme.TURQUOISE)
         theme_key = getattr(theme, "value", theme)
         colors = THEMES.get(theme_key) or THEMES[AppTheme.TURQUOISE.value]
         self.bg = colors["bg"]
@@ -176,12 +177,20 @@ class LicenseDialog(tk.Toplevel):
             seats = t("lic.seats", n=plan.seats) if plan.seats else ""
             name = plan.name_fa if _is_fa() else plan.name_en
             label = t("lic.plan_row", name=name, days=days_txt, seats=seats, usd=plan.price_usd)
-            ttk.Radiobutton(
+            tk.Radiobutton(
                 pay_card,
                 text=label,
                 value=plan.sku,
                 variable=self.plan_var,
                 command=self._refresh_invoice,
+                bg=card_bg,
+                fg=self.fg,
+                selectcolor=card_bg,
+                activebackground=card_bg,
+                activeforeground=self.fg,
+                highlightthickness=0,
+                anchor="w",
+                font=("Arial", 10),
             ).pack(anchor="w", pady=1)
 
         inv = tk.Frame(pay_card, bg=card_bg)
