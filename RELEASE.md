@@ -1,10 +1,10 @@
-# RebarAgent v1.6.1 – Release Notes
+# RebarAgent v1.6.2 – Release Notes
 
 ## Product
 Offline desktop **Bar Bending Schedule (BBS)** + **1D cutting optimization** for detailers and site engineers.
 
 - English UI (default) + full Persian i18n
-- Iran-first commerce via WhatsApp **+989160684552**
+- Iran-first commerce: **USDT TRC20 self-serve** in License Management (WhatsApp **+989160684552** only for problems)
 - Trial / Pro / Office / Lifetime licensing
 
 ## What is included
@@ -37,10 +37,12 @@ python build_exe.py
 
 ## Pre-ship checklist
 - [x] `pytest tests/ -q`
-- [x] APP_VERSION / pyproject = **1.6.1**
-- [x] WhatsApp sales number in config
+- [x] APP_VERSION / pyproject = **1.6.2**
+- [ ] Set `REBARAGENT_USDT_TRC20` or `payment.json` to your Tron USDT wallet before shipping
+- [ ] WhatsApp sales number in config (fallback)
 - [ ] Manual smoke on Windows: Sample → Cutting → Confirm → Export
-- [ ] Generate trial/pro keys with `generate_license.py`
+- [ ] License dialog: pick plan → copy exact USDT amount (TronGrid mock or real 1-min wait)
+- [ ] Optional: run `python tools/usdt_license_bot.py` on a VPS you control
 - [ ] Change `REBARAGENT_LICENSE_SECRET` for production
 
 ## Do not ship

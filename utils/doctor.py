@@ -183,6 +183,20 @@ def run_doctor(project_id: Optional[int] = None) -> DoctorReport:
 
     report.checks.append(_check("excel_import", _excel_import))
 
+    def _usdt_checkout():
+        from utils.usdt_payment import get_usdt_receive_address, is_valid_tron_address, list_checkout_plans
+        plans = list_checkout_plans()
+        if len(plans) < 3:
+            raise RuntimeError("checkout plans missing")
+        addr = get_usdt_receive_address()
+        if not addr:
+            raise RuntimeError("USDT TRC20 receive address is not set (self-serve checkout idle)")
+        if not is_valid_tron_address(addr):
+            raise RuntimeError("USDT TRC20 address is invalid")
+        return f"plans={len(plans)} addr={addr[:4]}…{addr[-4:]}"
+
+    report.checks.append(_check("usdt_checkout", _usdt_checkout, level_on_fail="warning"))
+
     if project_id is not None:
         def _project():
             from db.models import RebarModel

@@ -5,17 +5,16 @@ Admin tool to generate activation keys for customers.
 Uses the same secret key as the main application (utils/license.py).
 """
 
+import datetime
+import os
+import sys
+
 import tkinter as tk
 from tkinter import ttk, messagebox
-import hmac
-import hashlib
-import base64
-import datetime
 
-# ------------------------------------------------------------
-# Must match SECRET_KEY in utils/license.py
-# ------------------------------------------------------------
-SECRET_KEY = b'AiRebar2025!SecretKeyForLicenseSigning'
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from utils.license import generate_activation_key
 
 # License types and their durations (days), unlimited is None
 LICENSE_TYPES = {
@@ -27,14 +26,8 @@ LICENSE_TYPES = {
 
 
 def generate_key(machine_id: str, license_type: str, expiry_date: str, issued_date: str) -> str:
-    """
-    Create a signed activation key.
-    """
-    msg = f"{machine_id}|{license_type}|{expiry_date}|{issued_date}".encode()
-    signature = hmac.new(SECRET_KEY, msg, hashlib.sha256).hexdigest()
-    raw = f"{machine_id}|{license_type}|{expiry_date}|{issued_date}|{signature}"
-    encoded = base64.urlsafe_b64encode(raw.encode("utf-8")).decode("ascii")
-    return encoded
+    """Create a signed activation key (delegates to utils.license)."""
+    return generate_activation_key(machine_id, license_type, expiry_date, issued_date)
 
 
 class LicenseGeneratorApp:

@@ -1,5 +1,11 @@
 # RebarAgent Changelog
 
+## [1.6.2] – 2026-09-13 (Self-serve USDT checkout)
+- License dialog activates automatically after a matching **USDT TRC20** payment (exact unique amount per machine+plan)
+- Optional Telegram bot (`tools/usdt_license_bot.py`) issues the same keys without WhatsApp
+- WhatsApp is fallback for payment problems only
+- Set the receive wallet via `REBARAGENT_USDT_TRC20` or `payment.json` (see `payment.json.example`)
+
 ## [1.6.1] – 2026-09-11 (Correctness & Iran-first hardening)
 - **Cutting optimizer** now materializes the integer column-generation solution (was discarded, always FFD)
 - **Scrap bank** keeps identical leftover bars as separate pieces instead of collapsing them

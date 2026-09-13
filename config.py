@@ -5,7 +5,7 @@ import os
 import json
 
 APP_NAME = "RebarAgent"
-APP_VERSION = "1.6.1"
+APP_VERSION = "1.6.2"
 
 from enum import Enum
 
@@ -90,9 +90,17 @@ PURCHASE_CONTACT = {
     "whatsapp_digits": "989160684552",
     "telegram": "@RebarAgent",
     "email": "license@rebaragent.local",
-    "note_en": "Send your Machine ID and chosen plan via WhatsApp. You will receive an activation key after payment.",
-    "note_fa": "شناسه سیستم و پلن انتخابی را از واتساپ ارسال کنید. پس از پرداخت، کلید فعال‌سازی دریافت می‌کنید.",
+    "note_en": "Pay USDT (TRC20) in License Management — the app activates itself. WhatsApp is only for problems.",
+    "note_fa": "در مدیریت لایسنس تتر (TRC20) بپردازید؛ برنامه خودش فعال می‌شود. واتساپ فقط برای مشکل است.",
 }
+
+# Self-serve USDT checkout (TRC20). Leave empty until you set a receive wallet.
+# Override without rebuild: env REBARAGENT_USDT_TRC20, or payment.json next to the app / in the license dir.
+USDT_TRC20_ADDRESS = os.environ.get("REBARAGENT_USDT_TRC20", "").strip()
+USDT_TRC20_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
+USDT_PAYMENT_NETWORK = "TRC20"
+USDT_PAYMENT_MAX_AGE_SEC = 7 * 24 * 3600
+TRONGRID_API_URL = "https://api.trongrid.io"
 
 STANDARD_STOCK_LENGTHS_M = [6, 12]
 STANDARD_BRANCH_LENGTHS = STANDARD_STOCK_LENGTHS_M

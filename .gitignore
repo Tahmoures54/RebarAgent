@@ -20,6 +20,9 @@ venv/
 *.db-shm
 logs/
 license.dat
+used_usdt_txids.json
+payment.json
+telegram_bot_state.json
 e2e_exports/
 *.log
 

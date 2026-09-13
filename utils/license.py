@@ -29,6 +29,49 @@ HIDDEN_FILE = HIDDEN_LICENSE_FILE
 
 LICENSE_TABLE = "license_info"
 
+# Signed key types understood by check_license / activate_license
+LICENSE_DURATION_DAYS = {
+    "3month": 90,
+    "6month": 180,
+    "1year": 365,
+    "unlimited": None,
+}
+
+PLAN_SKU_TO_LICENSE_TYPE = {
+    "pro_3m": "3month",
+    "pro_6m": "6month",
+    "pro_1y": "1year",
+    "office_1y": "1year",
+    "unlimited": "unlimited",
+}
+
+
+def generate_activation_key(machine_id, license_type, expiry_date=None, issued_date=None):
+    """Create a signed activation key (same format as generate_license.py)."""
+    if license_type not in LICENSE_DURATION_DAYS:
+        raise ValueError(f"Unknown license type: {license_type}")
+    issued = issued_date or datetime.date.today().isoformat()
+    days = LICENSE_DURATION_DAYS[license_type]
+    if license_type == "unlimited":
+        expiry = expiry_date or "2099-12-31"
+    else:
+        expiry = expiry_date or (datetime.date.today() + datetime.timedelta(days=days)).isoformat()
+    msg = f"{machine_id}|{license_type}|{expiry}|{issued}".encode()
+    signature = hmac.new(SECRET_KEY, msg, hashlib.sha256).hexdigest()
+    raw = f"{machine_id}|{license_type}|{expiry}|{issued}|{signature}"
+    return base64.urlsafe_b64encode(raw.encode("utf-8")).decode("ascii")
+
+
+def issue_and_activate(db, plan_sku, machine_id=None):
+    """Build a key for this machine and apply it. Returns (ok, message, key)."""
+    lic_type = PLAN_SKU_TO_LICENSE_TYPE.get(plan_sku)
+    if not lic_type:
+        return False, f"Unknown plan: {plan_sku}", None
+    mid = machine_id or get_machine_id()
+    key = generate_activation_key(mid, lic_type)
+    ok, message = activate_license(key, db)
+    return ok, message, key if ok else None
+
 
 # ----------------------------------------------------------------------
 # Database helpers
