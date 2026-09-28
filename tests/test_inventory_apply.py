@@ -70,3 +70,65 @@ def test_empty_ledger_is_not_successful_rollback():
     result = inventory_apply.revert_cutting_plan_inventory(1, {})
     assert result["ok"] is False
     assert result["errors"] == ["empty ledger"]
+
+
+def test_apply_optimizer_shaped_plan_consumes_stock_and_scraps(isolated_db):
+    """Real structure from optimize_with_scraps_and_stock must update inventory."""
+    from db.models import ProjectModel, StockModel, ScrapModel
+    from logic.inventory_apply import apply_cutting_plan_inventory, revert_cutting_plan_inventory
+
+    pid = ProjectModel.create("opt-shape", "test")
+    StockModel.add(pid, 16.0, 12000.0, 5, grade="A3")
+    scrap_id = ScrapModel.add_scrap(pid, 16.0, 3500.0, grade="A3")
+
+    plans_per_group = {
+        (16.0, "A3"): {
+            "plans": [
+                {"bin": [(3.0, {"diameter": 16, "grade": "A3"})], "bar_length": 3.5, "scrap_id": scrap_id},
+                {"bin": [(6.0, {"diameter": 16, "grade": "A3"}), (5.5, {"diameter": 16, "grade": "A3"})],
+                 "bar_length": 12.0, "scrap_id": None, "stock_seq": 1},
+                {"bin": [(4.0, {"diameter": 16, "grade": "A3"})],
+                 "bar_length": 12.0, "scrap_id": None, "stock_seq": 2},
+            ],
+            "new_scraps": [0.5, 8.0],
+            "stock_usage": {12.0: 2},
+        }
+    }
+
+    ledger = apply_cutting_plan_inventory(pid, plans_per_group, 12.0)
+    assert ledger["errors"] == []
+    assert scrap_id in ledger["scraps_marked_used"]
+    assert ledger["stock_bars_consumed"] == 2
+    assert len(ledger["scraps_added_ids"]) == 2
+
+    avail = ScrapModel.get_available_scraps(pid, 16.0, "A3")
+    assert all(row[0] != scrap_id for row in avail)
+
+    rows = StockModel.get_for_diameter(pid, 16.0, "A3")
+    assert rows
+    qty = rows[0][3]
+    assert int(qty) == 3
+
+    result = revert_cutting_plan_inventory(pid, ledger)
+    assert result["ok"]
+    assert result["restored_stock"] == 2
+    rows = StockModel.get_for_diameter(pid, 16.0, "A3")
+    assert int(rows[0][3]) == 5
+    avail = ScrapModel.get_available_scraps(pid, 16.0, "A3")
+    assert any(row[0] == scrap_id for row in avail)
+    all_scraps = ScrapModel.get_all_scraps(pid, 16.0)
+    assert len([s for s in all_scraps if s[5] in (0, False, "0")]) == 1
+
+
+def test_hash_stable_across_confirm_used_flag(isolated_db, monkeypatch):
+    """Unused-only hashing is deterministic after scraps are marked used."""
+    from db.models import ProjectModel, ScrapModel
+    from ui.cutting_plan_db import _compute_data_hash
+
+    pid = ProjectModel.create("hash-stable", "test")
+    ScrapModel.add_scrap(pid, 12.0, 1000.0, grade="A3")
+    for s in ScrapModel.get_all_scraps(pid):
+        ScrapModel.mark_as_used(s[0])
+    h2 = _compute_data_hash(pid, None, 12.0)
+    h3 = _compute_data_hash(pid, None, 12.0)
+    assert h2 == h3

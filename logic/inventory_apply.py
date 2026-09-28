@@ -4,13 +4,50 @@
 from __future__ import annotations
 
 import logging
-from typing import List
+from collections import defaultdict
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("RebarAgent.InventoryApply")
 
 
+def _iter_groups(plans_per_group) -> List[Tuple[Optional[float], Optional[str], dict]]:
+    """Yield (diameter, grade, group_dict) from UI / optimizer plan maps."""
+    groups = plans_per_group or {}
+    if not isinstance(groups, dict):
+        return [(None, None, g) for g in (groups or []) if isinstance(g, dict)]
+
+    # Test/helper shape: {"plans": [{"bars": [...]}]}
+    if "plans" in groups and all(not isinstance(k, tuple) for k in groups.keys()):
+        only_plans = groups.get("plans") or []
+        if only_plans and isinstance(only_plans[0], dict) and (
+            "bars" in only_plans[0] or "stock_bars" in only_plans[0]
+        ):
+            return [(None, None, g) for g in only_plans if isinstance(g, dict)]
+
+    out = []
+    for key, value in groups.items():
+        if isinstance(key, str) and key.startswith("_"):
+            continue
+        if not isinstance(value, dict):
+            continue
+        dia = grade = None
+        if isinstance(key, tuple) and len(key) >= 2:
+            try:
+                dia = float(key[0])
+            except Exception:
+                dia = None
+            grade = key[1]
+        out.append((dia, grade, value))
+    return out
+
+
 def apply_cutting_plan_inventory(project_id: int, plans_per_group: dict, stock_len_m: float) -> dict:
     """Apply inventory changes atomically from the UI's point of view.
+
+    Supports two plan shapes:
+      1) Optimizer/UI: plans_per_group[(dia, grade)] = {plans: [...], new_scraps: [...]}
+         where each plan has bar_length / scrap_id / bin
+      2) Legacy/test: {"plans": [{"bars": [{diameter, length_m, quantity, scrap_ids, offcuts}]}]}
 
     Every successful mutation is recorded immediately. If any mutation fails,
     all successful mutations from this call are reverted and the function
@@ -25,62 +62,155 @@ def apply_cutting_plan_inventory(project_id: int, plans_per_group: dict, stock_l
     errors: List[str] = []
     InventoryManager(project_id)
 
-    groups = plans_per_group or {}
-    if isinstance(groups, dict) and "plans" in groups:
-        iterable = groups.get("plans") or []
-    elif isinstance(groups, dict):
-        iterable = list(groups.values())
-    else:
-        iterable = groups
-
-    for group in iterable:
-        if not isinstance(group, dict):
-            continue
+    for dia_key, grade_key, group in _iter_groups(plans_per_group):
+        # ---- Legacy/test path: explicit bars list ----
         bars = group.get("bars") or group.get("stock_bars") or []
-        for bar in bars:
-            if not isinstance(bar, dict):
-                continue
+        if bars:
+            for bar in bars:
+                if not isinstance(bar, dict):
+                    continue
+                for sid in bar.get("scrap_ids") or bar.get("used_scrap_ids") or []:
+                    try:
+                        sid_int = int(sid)
+                        if _mark_scrap_used_raw(sid_int):
+                            scraps_marked_used.append(sid_int)
+                        else:
+                            errors.append(f"could not mark scrap {sid_int} as used")
+                    except Exception as e:
+                        errors.append(f"mark scrap {sid}: {e}")
 
-            for sid in bar.get("scrap_ids") or bar.get("used_scrap_ids") or []:
+                for off in bar.get("offcuts") or bar.get("scraps") or []:
+                    try:
+                        if not isinstance(off, dict):
+                            continue
+                        dia = float(off.get("diameter") or off.get("dia") or dia_key or 0)
+                        length = float(off.get("length_mm") or off.get("length") or 0)
+                        grade = off.get("grade") if off.get("grade") is not None else grade_key
+                        if dia <= 0 or length <= 0:
+                            errors.append("invalid offcut dimensions")
+                            continue
+                        sid = ScrapModel.add_scrap(project_id, dia, length, grade=grade)
+                        if sid:
+                            scraps_added_ids.append(int(sid))
+                        else:
+                            errors.append(f"could not add offcut Ø{dia} {length}mm")
+                    except Exception as e:
+                        errors.append(f"add offcut: {e}")
+
                 try:
-                    sid_int = int(sid)
+                    dia = float(bar.get("diameter") or bar.get("dia") or dia_key or 0)
+                    length_mm = float(
+                        bar.get("length_mm")
+                        or (bar.get("length_m") or stock_len_m) * 1000
+                    )
+                    qty = int(bar.get("quantity") or 1)
+                    grade = bar.get("grade") if bar.get("grade") is not None else grade_key
+                    if dia > 0 and qty > 0 and not bar.get("is_scrap"):
+                        if _consume_stock_bar(project_id, dia, length_mm, qty, grade):
+                            stock_ledger.append(
+                                {
+                                    "diameter": dia,
+                                    "length_mm": length_mm,
+                                    "quantity": qty,
+                                    "grade": grade,
+                                }
+                            )
+                        else:
+                            errors.append(
+                                f"insufficient/unavailable stock Ø{dia} {length_mm}mm x{qty}"
+                            )
+                except Exception as e:
+                    errors.append(f"consume stock: {e}")
+            continue
+
+        # ---- Real optimizer path: plans + new_scraps ----
+        plans = group.get("plans") or []
+        stock_need: Dict[Tuple[float, Optional[str]], int] = defaultdict(int)
+
+        for plan in plans:
+            if not isinstance(plan, dict):
+                continue
+            scrap_id = plan.get("scrap_id")
+            if scrap_id is not None:
+                try:
+                    sid_int = int(scrap_id)
                     if _mark_scrap_used_raw(sid_int):
                         scraps_marked_used.append(sid_int)
                     else:
                         errors.append(f"could not mark scrap {sid_int} as used")
                 except Exception as e:
-                    errors.append(f"mark scrap {sid}: {e}")
-
-            for off in bar.get("offcuts") or bar.get("scraps") or []:
-                try:
-                    if not isinstance(off, dict):
-                        continue
-                    dia = float(off.get("diameter") or off.get("dia") or 0)
-                    length = float(off.get("length_mm") or off.get("length") or 0)
-                    grade = off.get("grade")
-                    if dia <= 0 or length <= 0:
-                        errors.append("invalid offcut dimensions")
-                        continue
-                    sid = ScrapModel.add_scrap(project_id, dia, length, grade=grade)
-                    if sid:
-                        scraps_added_ids.append(int(sid))
-                    else:
-                        errors.append(f"could not add offcut Ø{dia} {length}mm")
-                except Exception as e:
-                    errors.append(f"add offcut: {e}")
+                    errors.append(f"mark scrap {scrap_id}: {e}")
+                continue
 
             try:
-                dia = float(bar.get("diameter") or bar.get("dia") or 0)
-                length_mm = float(bar.get("length_mm") or (bar.get("length_m") or stock_len_m) * 1000)
-                qty = int(bar.get("quantity") or 1)
-                grade = bar.get("grade")
-                if dia > 0 and qty > 0 and not bar.get("is_scrap"):
-                    if _consume_stock_bar(project_id, dia, length_mm, qty, grade):
-                        stock_ledger.append({"diameter": dia, "length_mm": length_mm, "quantity": qty, "grade": grade})
-                    else:
-                        errors.append(f"insufficient/unavailable stock Ø{dia} {length_mm}mm x{qty}")
+                bar_len_m = float(plan.get("bar_length") or stock_len_m)
+                length_mm = bar_len_m * 1000.0
+                dia = float(
+                    plan.get("diameter")
+                    or plan.get("dia")
+                    or dia_key
+                    or 0
+                )
+                grade = plan.get("grade") if plan.get("grade") is not None else grade_key
+                if dia <= 0:
+                    for _piece, label in plan.get("bin") or []:
+                        if isinstance(label, dict):
+                            if label.get("diameter") or label.get("dia"):
+                                dia = float(label.get("diameter") or label.get("dia"))
+                            if grade is None and label.get("grade") is not None:
+                                grade = label.get("grade")
+                            if dia > 0:
+                                break
+                if dia > 0:
+                    stock_need[(round(length_mm, 3), grade)] += 1
+                else:
+                    errors.append("stock plan missing diameter")
             except Exception as e:
-                errors.append(f"consume stock: {e}")
+                errors.append(f"stock plan parse: {e}")
+
+        for (length_mm, grade), qty in stock_need.items():
+            dia = float(dia_key or 0)
+            if dia <= 0:
+                errors.append(f"cannot consume stock without diameter for {length_mm}mm x{qty}")
+                continue
+            if _consume_stock_bar(project_id, dia, length_mm, qty, grade):
+                stock_ledger.append(
+                    {
+                        "diameter": dia,
+                        "length_mm": float(length_mm),
+                        "quantity": int(qty),
+                        "grade": grade,
+                    }
+                )
+            else:
+                errors.append(
+                    f"insufficient/unavailable stock Ø{dia} {length_mm}mm x{qty}"
+                )
+
+        for off in group.get("new_scraps") or []:
+            try:
+                if isinstance(off, dict):
+                    dia = float(off.get("diameter") or off.get("dia") or dia_key or 0)
+                    length = float(
+                        off.get("length_mm")
+                        or off.get("length")
+                        or (float(off.get("length_m") or 0) * 1000)
+                    )
+                    grade = off.get("grade") if off.get("grade") is not None else grade_key
+                else:
+                    dia = float(dia_key or 0)
+                    length = float(off) * 1000.0
+                    grade = grade_key
+                if dia <= 0 or length <= 0:
+                    errors.append("invalid new_scrap dimensions")
+                    continue
+                sid = ScrapModel.add_scrap(project_id, dia, length, grade=grade)
+                if sid:
+                    scraps_added_ids.append(int(sid))
+                else:
+                    errors.append(f"could not add offcut Ø{dia} {length}mm")
+            except Exception as e:
+                errors.append(f"add new_scrap: {e}")
 
     ledger = {
         "project_id": project_id,
@@ -100,10 +230,19 @@ def apply_cutting_plan_inventory(project_id: int, plans_per_group: dict, stock_l
 
     try:
         from utils.events import bus
-        bus.emit("cut.confirmed", {"project_id": project_id, "ledger": {"stock_bars_consumed": ledger["stock_bars_consumed"]}})
+        bus.emit(
+            "cut.confirmed",
+            {
+                "project_id": project_id,
+                "ledger": {"stock_bars_consumed": ledger["stock_bars_consumed"]},
+            },
+        )
         bus.emit("stock.changed", {"project_id": project_id, "reason": "cut_confirm"})
         bus.emit("scrap.changed", {"project_id": project_id, "reason": "cut_confirm"})
-        bus.emit("ui.refresh_request", {"reason": "cut_confirmed", "project_id": project_id})
+        bus.emit(
+            "ui.refresh_request",
+            {"reason": "cut_confirmed", "project_id": project_id},
+        )
     except Exception:
         pass
     return ledger
@@ -114,7 +253,13 @@ def revert_cutting_plan_inventory(project_id: int, ledger: dict) -> dict:
     from db.models import ScrapModel, StockModel
 
     if not ledger:
-        return {"ok": False, "restored_scraps": 0, "deleted_offcuts": 0, "restored_stock": 0, "errors": ["empty ledger"]}
+        return {
+            "ok": False,
+            "restored_scraps": 0,
+            "deleted_offcuts": 0,
+            "restored_stock": 0,
+            "errors": ["empty ledger"],
+        }
 
     errors = []
     restored_scraps = deleted_offcuts = restored_stock = 0
@@ -153,14 +298,26 @@ def revert_cutting_plan_inventory(project_id: int, ledger: dict) -> dict:
 
     try:
         from utils.events import bus
-        bus.emit("cut.rolled_back", {"project_id": project_id, "restored_stock": restored_stock})
+        bus.emit(
+            "cut.rolled_back",
+            {"project_id": project_id, "restored_stock": restored_stock},
+        )
         bus.emit("stock.changed", {"project_id": project_id, "reason": "cut_rollback"})
         bus.emit("scrap.changed", {"project_id": project_id, "reason": "cut_rollback"})
-        bus.emit("ui.refresh_request", {"reason": "cut_rolled_back", "project_id": project_id})
+        bus.emit(
+            "ui.refresh_request",
+            {"reason": "cut_rolled_back", "project_id": project_id},
+        )
     except Exception:
         pass
 
-    return {"ok": len(errors) == 0, "restored_scraps": restored_scraps, "deleted_offcuts": deleted_offcuts, "restored_stock": restored_stock, "errors": errors}
+    return {
+        "ok": len(errors) == 0,
+        "restored_scraps": restored_scraps,
+        "deleted_offcuts": deleted_offcuts,
+        "restored_stock": restored_stock,
+        "errors": errors,
+    }
 
 
 def _mark_scrap_used_raw(scrap_id: int) -> bool:
@@ -175,7 +332,11 @@ def _mark_scrap_used_raw(scrap_id: int) -> bool:
 def _mark_scrap_unused_raw(scrap_id: int) -> bool:
     try:
         import db.database as database
-        database.db.execute("UPDATE scraps SET used = 0 WHERE id = ?", (int(scrap_id),), commit=True)
+        database.db.execute(
+            "UPDATE scraps SET used = 0 WHERE id = ?",
+            (int(scrap_id),),
+            commit=True,
+        )
         return True
     except Exception:
         return False
