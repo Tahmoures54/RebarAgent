@@ -1,3 +1,5 @@
+import pytest
+
 from logic.inventory_apply import _parse_stock_row
 from db.models import ScrapModel, ProjectModel
 import logic.inventory_apply as inventory_apply
@@ -19,18 +21,15 @@ def test_identical_scraps_are_not_merged(isolated_db):
     assert len(rows) == 2
 
 
-def test_apply_records_only_successful_stock_consumption(monkeypatch):
+def test_apply_aborts_when_stock_consumption_fails(monkeypatch):
     monkeypatch.setattr(inventory_apply, "_consume_stock_bar", lambda *args: False)
 
-    ledger = inventory_apply.apply_cutting_plan_inventory(
-        1,
-        {"plans": [{"bars": [{"diameter": 16, "length_m": 12, "quantity": 2}]}]},
-        12,
-    )
-
-    assert ledger["stock_consumed"] == []
-    assert ledger["stock_bars_consumed"] == 0
-    assert any("unavailable stock" in e for e in ledger["errors"])
+    with pytest.raises(RuntimeError, match="Inventory apply aborted"):
+        inventory_apply.apply_cutting_plan_inventory(
+            1,
+            {"plans": [{"bars": [{"diameter": 16, "length_m": 12, "quantity": 2}]}]},
+            12,
+        )
 
 
 def test_apply_records_successful_stock_consumption(monkeypatch):
@@ -47,6 +46,24 @@ def test_apply_records_successful_stock_consumption(monkeypatch):
         {"diameter": 16.0, "length_mm": 12000.0, "quantity": 2, "grade": None}
     ]
     assert ledger["errors"] == []
+
+
+def test_apply_rolls_back_successful_mutations_when_later_mutation_fails(monkeypatch):
+    marked = []
+    unmarked = []
+    monkeypatch.setattr(inventory_apply, "_mark_scrap_used_raw", lambda sid: marked.append(sid) or True)
+    monkeypatch.setattr(inventory_apply, "_mark_scrap_unused_raw", lambda sid: unmarked.append(sid) or True)
+    monkeypatch.setattr(inventory_apply, "_consume_stock_bar", lambda *args: False)
+
+    with pytest.raises(RuntimeError):
+        inventory_apply.apply_cutting_plan_inventory(
+            1,
+            {"plans": [{"bars": [{"scrap_ids": [42], "diameter": 16, "length_m": 12, "quantity": 1}]}]},
+            12,
+        )
+
+    assert marked == [42]
+    assert unmarked == [42]
 
 
 def test_empty_ledger_is_not_successful_rollback():
