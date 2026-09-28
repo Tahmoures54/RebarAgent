@@ -47,6 +47,7 @@ class MenuBar(tk.Frame):
                 "sep",
                 ("show_scrap_manager", "♻️ Scrap Manager", None),
                 ("show_stock_manager", "📦 Stock Manager", None),
+                ("show_site_tools", "Site tools (buy / 6vs12 / marks)", None),
                 "sep",
                 ("open_custom_shape_designer", "✏️ Custom Shape Designer", None),
                 "sep",
@@ -86,7 +87,6 @@ class MenuBar(tk.Frame):
 
     def _get_handler(self, method_name: str):
         def handler():
-            # special case
             if method_name == "quit":
                 try:
                     self.app.destroy()
@@ -114,5 +114,4 @@ class MenuBar(tk.Frame):
         return "Cmd" if sys.platform == "darwin" else "Ctrl"
 
     def update_state(self, project_is_open: bool):
-        # optional: enable/disable menu items based on project state
         pass
