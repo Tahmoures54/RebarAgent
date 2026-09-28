@@ -157,6 +157,13 @@ def run_doctor(project_id: Optional[int] = None) -> DoctorReport:
 
     def _optimizer():
         from logic.optimizer import optimize_cuts, PULP_AVAILABLE, MIP_AVAILABLE
+        try:
+            from logic.optimizer_packing import _ensure_mip_available
+            _ensure_mip_available()
+            from logic import optimizer_packing as _op
+            mip_flag = bool(_op.MIP_AVAILABLE)
+        except Exception:
+            mip_flag = bool(MIP_AVAILABLE)
         bins = optimize_cuts([4.0, 4.0, 4.0], 12.0)
         if not bins:
             raise RuntimeError("optimize_cuts returned empty for a feasible instance")
@@ -165,7 +172,7 @@ def run_doctor(project_id: Optional[int] = None) -> DoctorReport:
         packed = [x for b in bins for x in b]
         if len(packed) != 3:
             raise RuntimeError(f"lost pieces: {packed}")
-        return f"bars={len(bins)} pulp={PULP_AVAILABLE} mip={MIP_AVAILABLE}"
+        return f"bars={len(bins)} pulp={PULP_AVAILABLE} mip={mip_flag}"
 
     report.checks.append(_check("optimizer", _optimizer))
 
