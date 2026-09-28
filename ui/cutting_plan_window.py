@@ -18,6 +18,7 @@ from logic.inventory import apply_cutting_plan_inventory, revert_cutting_plan_in
 from ui.cutting_plan_db import _compute_data_hash, _load_plan, _save_plan, _confirm_plan
 from utils.logger import setup_logger
 from utils.i18n import t
+import utils.i18n_cut  # noqa: F401
 
 logger = setup_logger("RebarAgent.CuttingPlan")
 
@@ -27,7 +28,7 @@ class CuttingPlanWindow(tk.Toplevel):
 
     def __init__(self, parent, project_id, data_by_key, stock_length, listofer_filter=None):
         super().__init__(parent)
-        self.title("Cutting Plan")
+        self.title(t("cut.title"))
         self.geometry("960x640")
         self.transient(parent)
         self.project_id = project_id
@@ -47,12 +48,12 @@ class CuttingPlanWindow(tk.Toplevel):
     def create_widgets(self):
         top = ttk.Frame(self, padding=8)
         top.pack(fill=tk.X)
-        ttk.Button(top, text="Generate / Optimize", command=self.generate_plan).pack(side=tk.LEFT, padx=4)
-        self.btn_confirm = ttk.Button(top, text="Confirm Plan", command=self.confirm_plan)
+        ttk.Button(top, text=t("cut.generate"), command=self.generate_plan).pack(side=tk.LEFT, padx=4)
+        self.btn_confirm = ttk.Button(top, text=t("cut.confirm_plan"), command=self.confirm_plan)
         self.btn_confirm.pack(side=tk.LEFT, padx=4)
-        ttk.Button(top, text="Re-optimize", command=self.re_optimize).pack(side=tk.LEFT, padx=4)
-        ttk.Button(top, text="Export HTML", command=self.export_html).pack(side=tk.LEFT, padx=4)
-        ttk.Button(top, text="Close", command=self.destroy).pack(side=tk.RIGHT, padx=4)
+        ttk.Button(top, text=t("cut.reoptimize"), command=self.re_optimize).pack(side=tk.LEFT, padx=4)
+        ttk.Button(top, text=t("cut.export_html"), command=self.export_html).pack(side=tk.LEFT, padx=4)
+        ttk.Button(top, text=t("btn.close"), command=self.destroy).pack(side=tk.RIGHT, padx=4)
         ttk.Label(top, textvariable=self.summary_var).pack(side=tk.LEFT, padx=12)
         self.coach_var = tk.StringVar(value="")
         ttk.Label(self, textvariable=self.coach_var, wraplength=920, foreground="#0f766e").pack(fill=tk.X, padx=12, pady=(0, 4))
@@ -89,7 +90,7 @@ class CuttingPlanWindow(tk.Toplevel):
         for tab in self.notebook.tabs():
             self.notebook.forget(tab)
         if not PULP_AVAILABLE:
-            messagebox.showerror("Error", "PuLP not installed. pip install pulp", parent=self)
+            messagebox.showerror(t("common.error"), t("cut.pulp_missing"), parent=self)
             self._optimizing = False
             return
         if not self._bypass_cache:
@@ -134,7 +135,7 @@ class CuttingPlanWindow(tk.Toplevel):
             def done():
                 self._optimizing = False
                 if err:
-                    messagebox.showerror("Optimization", err, parent=self)
+                    messagebox.showerror(t("cut.optimization"), err, parent=self)
                 else:
                     self.plans_per_group = temp
                     self.plan_status = "draft"
@@ -182,7 +183,7 @@ class CuttingPlanWindow(tk.Toplevel):
                 total_waste += waste
             if new_scraps:
                 tree.insert("", tk.END, values=("-", f"offcuts: {new_scraps}", "", "", ""))
-        self.summary_var.set(f"Status: {self.plan_status}  |  bars: {n_bars}  |  waste: {total_waste:.2f} m")
+        self.summary_var.set(t("cut.status_summary", status=self.plan_status, bars=n_bars, waste=total_waste))
         try:
             from logic.cutting_coach import coach_from_plan_groups
             from utils.i18n import get_language
@@ -195,9 +196,9 @@ class CuttingPlanWindow(tk.Toplevel):
         if self.plan_status == "confirmed":
             return
         if not self.plans_per_group:
-            messagebox.showinfo("Info", "No plan to confirm.", parent=self)
+            messagebox.showinfo(t("common.info"), t("cut.no_plan"), parent=self)
             return
-        if not messagebox.askyesno("Confirm", "Apply this plan to inventory (scrap/stock)?", parent=self):
+        if not messagebox.askyesno(t("common.confirm"), t("cut.apply_inventory"), parent=self):
             return
         try:
             ledger = apply_cutting_plan_inventory(self.project_id, self.plans_per_group, self.stock_len)
@@ -214,15 +215,15 @@ class CuttingPlanWindow(tk.Toplevel):
             except Exception:
                 pass
             self._enable_buttons()
-            self.summary_var.set(f"Confirmed. Stock bars used: {ledger.get('stock_bars_consumed', 0)}")
-            messagebox.showinfo("Confirmed", "Inventory updated.", parent=self)
+            self.summary_var.set(t("cut.confirmed_summary", n=ledger.get("stock_bars_consumed", 0)))
+            messagebox.showinfo(t("cut.confirmed_title"), t("cut.inventory_updated"), parent=self)
         except Exception as e:
             logger.exception("confirm failed")
-            messagebox.showerror("Confirm", str(e), parent=self)
+            messagebox.showerror(t("common.confirm"), str(e), parent=self)
 
     def re_optimize(self):
         if self.plan_status == "confirmed" and self._inventory_ledger:
-            if not messagebox.askyesno("Re-optimize", "Revert inventory and re-run optimizer?", parent=self):
+            if not messagebox.askyesno(t("cut.reoptimize"), t("cut.revert_ask"), parent=self):
                 return
             try:
                 revert_cutting_plan_inventory(self.project_id, self._inventory_ledger)
@@ -233,7 +234,7 @@ class CuttingPlanWindow(tk.Toplevel):
                 except Exception:
                     pass
             except Exception as e:
-                messagebox.showerror("Revert", str(e), parent=self)
+                messagebox.showerror(t("cut.revert"), str(e), parent=self)
                 return
             self._inventory_ledger = None
             self.plan_status = "draft"
@@ -243,7 +244,7 @@ class CuttingPlanWindow(tk.Toplevel):
 
     def export_html(self):
         if not self.plans_per_group:
-            messagebox.showinfo("Info", "No plan to export.", parent=self)
+            messagebox.showinfo(t("common.info"), t("cut.no_export"), parent=self)
             return
         path = filedialog.asksaveasfilename(defaultextension=".html", filetypes=[("HTML", "*.html")])
         if not path:
@@ -268,6 +269,6 @@ class CuttingPlanWindow(tk.Toplevel):
                 rows.append("</table>")
             rows.append("</body></html>")
             Path(path).write_text("\n".join(rows), encoding="utf-8")
-            messagebox.showinfo("Export", f"Saved:\n{path}", parent=self)
+            messagebox.showinfo(t("cut.export"), t("cut.export_saved", path=path), parent=self)
         except Exception as e:
-            messagebox.showerror("Export", str(e), parent=self)
+            messagebox.showerror(t("cut.export"), str(e), parent=self)
