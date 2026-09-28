@@ -36,6 +36,9 @@ def _compute_data_hash(project_id, listofer_filter, stock_len):
     from db.models import RebarModel
     rebars = RebarModel.get_for_project(project_id, listofer_filter)
     scraps = ScrapModel.get_all_scraps(project_id)
+    # Only *available* scraps affect whether a cutting plan is still valid.
+    # Including used=1 rows made the hash change on Confirm, so the ledger
+    # could not be reloaded for Force Re-optimize after reopening the window.
     data_dict = {
         "project_id": project_id,
         "listofer_filter": listofer_filter,
@@ -46,8 +49,9 @@ def _compute_data_hash(project_id, listofer_filter, stock_len):
             for r in rebars
         ],
         "scraps": [
-            {"id": s[0], "dia": s[1], "len": s[2], "grade": s[3], "used": s[5], "lf": s[6]}
+            {"id": s[0], "dia": s[1], "len": s[2], "grade": s[3], "lf": s[6]}
             for s in scraps
+            if not (len(s) > 5 and s[5] in (1, True, "1"))
         ],
     }
     raw = json.dumps(data_dict, sort_keys=True, default=str)
