@@ -4,6 +4,7 @@ from collections import Counter
 
 import logic.optimizer as opt
 from logic.optimizer import optimize_cuts, optimize_labeled_cuts
+from logic.optimizer_options import OptimizerOptions
 
 TOL = 1e-6
 
@@ -22,9 +23,7 @@ def _assert_feasible(bins, stock_length):
 
 
 def _expected_new_scraps(plans, stock_length):
-    """
-    new_scraps are created only from stock bars (scrap_id == None).
-    """
+    """new_scraps are created only from stock bars (scrap_id == None)."""
     scraps = []
     for p in plans:
         if p.get("scrap_id") is None and abs(float(p.get("bar_length", 0)) - float(stock_length)) <= TOL:
@@ -47,8 +46,6 @@ class TestOptimizeCuts:
         bins = optimize_cuts([4.0, 4.0, 4.0], 12.0)
         assert _counter(_flatten(bins)) == _counter([4.0, 4.0, 4.0])
         _assert_feasible(bins, 12.0)
-
-        # Optimality check only if PuLP is available
         if opt.PULP_AVAILABLE:
             assert len(bins) == 1
 
@@ -67,7 +64,6 @@ class TestOptimizeCuts:
 
     def test_fallback_without_pulp(self, monkeypatch):
         monkeypatch.setattr("logic.optimizer_cg.PULP_AVAILABLE", False)
-
         bins = optimize_cuts([3.0, 5.0], 12.0)
         assert _counter(_flatten(bins)) == _counter([3.0, 5.0])
         _assert_feasible(bins, 12.0)
@@ -79,30 +75,22 @@ class TestOptimizeLabeledCuts:
     def test_no_scraps_only_stock(self):
         items = [(5.0, {"pos": "1"}), (5.0, {"pos": "2"})]
         stock_length = 12.0
-
         plans, new_scraps = optimize_labeled_cuts(items, stock_length)
-
         planned = [l for p in plans for (l, _) in p["bin"]]
         assert _counter(planned) == _counter([5.0, 5.0])
-
         for p in plans:
             assert sum(l for l, _ in p["bin"]) <= float(p["bar_length"]) + TOL
-
         assert sorted(new_scraps) == pytest.approx(_expected_new_scraps(plans, stock_length))
 
     def test_with_available_scrap(self):
         items = [(7.0, {"pos": "A"}), (4.0, {"pos": "B"})]
         scrap_list = [8.0]
         stock_length = 12.0
-
         plans, new_scraps = optimize_labeled_cuts(items, stock_length, scrap_list)
-
         planned = [l for p in plans for (l, _) in p["bin"]]
         assert _counter(planned) == _counter([7.0, 4.0])
-
         bar_lengths = sorted(float(p["bar_length"]) for p in plans)
-        assert 8.0 in bar_lengths  # should use scrap
-
+        assert 8.0 in bar_lengths
         assert sorted(new_scraps) == pytest.approx(_expected_new_scraps(plans, stock_length))
 
     def test_empty_items(self):
@@ -132,3 +120,17 @@ class TestOptimizeLabeledCuts:
         assert _counter(_flatten(cg)) == _counter(pieces)
         _assert_feasible(cg, stock)
         assert len(cg) <= len(ffd)
+
+    def test_kerf_reduces_physical_scrap(self):
+        items = [(5.0, {"pos": "1"}), (5.0, {"pos": "2"})]
+        opts = OptimizerOptions(kerf_m=0.10, min_usable_scrap_m=0.0)
+        plans, new_scraps = optimize_labeled_cuts(items, 12.0, opts=opts)
+        assert _counter([l for p in plans for l, _ in p["bin"]]) == _counter([5.0, 5.0])
+        assert new_scraps == pytest.approx([1.8], abs=TOL)
+
+    def test_kerf_infeasible_piece_is_not_silently_accepted(self):
+        items = [(11.95, {"pos": "too_long"})]
+        opts = OptimizerOptions(kerf_m=0.10)
+        plans, new_scraps = optimize_labeled_cuts(items, 12.0, opts=opts)
+        assert plans == []
+        assert new_scraps == []
