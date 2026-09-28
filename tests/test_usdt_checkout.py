@@ -239,12 +239,15 @@ def test_issue_and_activate_unknown_plan(isolated_db):
 
 def test_license_dialog_builds_on_plain_tk(isolated_db, tmp_path, monkeypatch):
     import os
-    import tkinter as tk
-    from ui.license_dialog import LicenseDialog
+    import pytest
 
     if not os.environ.get("DISPLAY") and os.name != "nt":
-        import pytest
         pytest.skip("no display")
+    try:
+        import tkinter as tk
+    except ModuleNotFoundError:
+        pytest.skip("tkinter not installed")
+    from ui.license_dialog import LicenseDialog
     monkeypatch.setenv("REBARAGENT_USDT_TRC20", "TMuA6YqfCeX8EhbfYEg5y7S4DqzSJireY9")
     monkeypatch.setattr("utils.license.HIDDEN_DIR", str(tmp_path))
     monkeypatch.setattr("utils.license.HIDDEN_FILE", str(tmp_path / "license.dat"))
