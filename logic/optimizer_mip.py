@@ -17,6 +17,37 @@ from logic.optimizer_cg import optimize_cuts
 logger = setup_logger("RebarAgent.OptimizerMIP")
 
 
+def _validate_index_bins(
+    bins_idx: List[List[int]],
+    pieces_mm: List[int],
+    stock_mm: int,
+    stock_count_limit: Optional[int],
+    allow_stock_overuse: bool,
+) -> bool:
+    """Validate a solver result before exposing it to the rest of the app."""
+    n = len(pieces_mm)
+    seen = [0] * n
+    for b in bins_idx:
+        if not b:
+            return False
+        used = 0
+        for i in b:
+            if i < 0 or i >= n:
+                return False
+            seen[i] += 1
+            if seen[i] > 1:
+                return False
+            used += pieces_mm[i]
+        if used > stock_mm:
+            return False
+    if any(count != 1 for count in seen):
+        return False
+    if stock_count_limit is not None and not allow_stock_overuse:
+        if len(bins_idx) > stock_count_limit:
+            return False
+    return True
+
+
 def optimize_cuts_mip_indexed(
     lengths: List[float],
     stock_length: float,
@@ -43,9 +74,14 @@ def optimize_cuts_mip_indexed(
     n = len(pieces_mm)
     total_length = sum(pieces_mm)
     lower_bound = int(np.ceil(total_length / stock_mm))
+
+    # If overuse is allowed, stock_count_limit is not a hard optimization cap.
     max_bins = min(n, max(1, lower_bound + 8))
-    if stock_count_limit is not None:
-        max_bins = min(max_bins, stock_count_limit)
+    if stock_count_limit is not None and not opts.allow_stock_overuse:
+        max_bins = min(max_bins, max(0, int(stock_count_limit)))
+    if max_bins <= 0:
+        return []
+
     if n > 140:
         bins = optimize_cuts(lengths, stock_length, opts, cancel_event)
         return _bins_to_index_bins(lengths, bins, scale)
@@ -70,10 +106,18 @@ def optimize_cuts_mip_indexed(
     if status not in (mip.OptimizationStatus.OPTIMAL, mip.OptimizationStatus.FEASIBLE):
         bins = optimize_cuts(lengths, stock_length, opts, cancel_event)
         return _bins_to_index_bins(lengths, bins, scale)
+
     bins_idx: List[List[int]] = []
     for j in range(max_bins):
         if y[j].x >= 0.99:
             bins_idx.append([i for i in range(n) if x[i][j].x >= 0.99])
+
+    if not _validate_index_bins(
+        bins_idx, pieces_mm, stock_mm, stock_count_limit, opts.allow_stock_overuse
+    ):
+        logger.warning("MIP returned an invalid packing; falling back to CG/FFD")
+        bins = optimize_cuts(lengths, stock_length, opts, cancel_event)
+        return _bins_to_index_bins(lengths, bins, scale)
     return bins_idx
 
 
