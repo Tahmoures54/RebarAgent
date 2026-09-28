@@ -16,3 +16,9 @@ def test_ffd_marks_oversize_unfit():
 
 def test_duplicate_report_empty():
     assert "No duplicate" in format_duplicate_report([])
+
+
+def test_ffd_all_unfit_on_short_stock():
+    r = first_fit_decreasing([7.0, 7.0], 6.0)
+    assert r["unfit"] == [7.0, 7.0]
+    assert r["bars"] == 0
