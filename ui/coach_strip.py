@@ -29,12 +29,12 @@ class CoachStrip(ttk.Frame):
     def _build(self):
         bar = ttk.Frame(self)
         bar.pack(fill="x", padx=4, pady=2)
-        ttk.Label(bar, text="Quick path:", font=("Segoe UI", 9, "bold")).pack(side="left", padx=(4, 8))
+        ttk.Label(bar, text="Next step", font=("Segoe UI", 9)).pack(side="left", padx=(4, 8))
         for text, cmd in (
-            ("1) Add position", self._go_add),
-            ("2) Stock / scraps", self._go_stock),
-            ("3) Cutting plan", self._go_cut),
-            ("Sample project", self._go_sample),
+            ("Add position", self._go_add),
+            ("Stock", self._go_stock),
+            ("Cutting plan", self._go_cut),
+            ("Sample", self._go_sample),
         ):
             ttk.Button(bar, text=text, command=cmd, width=16).pack(side="left", padx=3)
         self.tip_label = ttk.Label(bar, textvariable=self._tip, foreground="#475569")
