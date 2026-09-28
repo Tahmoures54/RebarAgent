@@ -78,7 +78,7 @@ class RebarAgentApp(tk.Tk):
 
     def _global_error_handler(self, exp_type, exp_value, exp_traceback):
         logger.critical("Uncaught Exception", exc_info=(exp_type, exp_value, exp_traceback))
-        messagebox.showerror("System Error", "A critical error occurred. Check logs.")
+        messagebox.showerror(t("err.system"), t("err.critical"))
 
     def _show_welcome_if_needed(self):
         if should_show_welcome():
