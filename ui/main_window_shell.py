@@ -71,6 +71,7 @@ class MainWindowShellMixin:
             ("Lap / splice", self.show_lap_splice),
             ("Dashboard", self._open_dashboard_safe),
             ("Insights", self._open_insights_safe),
+            ("Site tools", self.show_site_tools),
         ]
         self.action_rail = ActionRail(body, theme_key=theme_key, actions=rail_actions)
         self.action_rail.pack(side="left", fill="y", padx=(0, 8))
@@ -109,6 +110,12 @@ class MainWindowShellMixin:
 
         self.status_bar = StatusBar(self, self.app)
         self.status_bar.pack(side="bottom", fill="x")
+
+    def show_site_tools(self) -> None:
+        if not self._ensure_project():
+            return
+        from ui.edge_tools import SiteToolsWindow
+        SiteToolsWindow(self, self.app.state.current_project_id)
 
     def _open_dashboard_safe(self) -> None:
         if not self._ensure_project():
