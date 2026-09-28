@@ -154,8 +154,9 @@ def _pack_one_bar_ffd(
             used += need
         else:
             still.append((length, label))
-    cut = sum(l for l, _ in packed)
-    waste = max(0.0, bar_length - cut)
+    # Kerf consumes material too, so physical leftover must be based on
+    # effective used length rather than the sum of nominal cut lengths.
+    waste = max(0.0, bar_length - used)
     return packed, still, waste
 
 
@@ -174,7 +175,9 @@ def _pack_all_single_stock(
         adj_items = [(_effective_piece_length(l, kerf), lbl) for l, lbl in items]
         err = _validate_lengths([l for l, _ in adj_items], stock_length)
         if err:
-            adj_items = items
+            # Do not silently ignore kerf when it makes a piece infeasible.
+            logger.error("_pack_all_single_stock: %s", err)
+            return [], []
     else:
         adj_items = items
     remaining_lengths = [l for l, _ in adj_items]
@@ -188,8 +191,8 @@ def _pack_all_single_stock(
     min_scrap = opts.min_usable_scrap_m or 0.0
     for b in bins_idx:
         bin_items = [(items[i][0], items[i][1]) for i in b]
-        cut = sum(l for l, _ in bin_items)
-        waste = max(0.0, stock_length - cut)
+        used = sum(_effective_piece_length(l, kerf) for l, _ in bin_items)
+        waste = max(0.0, stock_length - used)
         if waste >= min_scrap - 1e-9 and waste > 1e-6:
             new_scraps.append(round(waste, 6))
         plans.append({
