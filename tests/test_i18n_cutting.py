@@ -1,3 +1,4 @@
+import utils.i18n_cut  # noqa: F401 — registers extra keys
 from utils.i18n import set_language, t
 
 

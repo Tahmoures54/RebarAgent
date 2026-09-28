@@ -8,6 +8,7 @@ from tkinter import messagebox
 
 from config import LOG_FILE, LOG_LEVEL, should_show_welcome, APP_VERSION, APP_NAME
 from utils.i18n import load_language_from_config, apply_to_config_globals, t
+import utils.i18n_cut  # noqa: F401 — registers extra cutting/error strings
 from db.database import DatabaseManager
 from ui.theme import ThemeManager
 from ui.splash_screen import SplashScreen

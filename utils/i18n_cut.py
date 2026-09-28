@@ -39,3 +39,7 @@ def register(strings: dict) -> None:
         "err.critical": "خطای جدی رخ داد. فایل لاگ را بررسی کنید.",
         "err.system": "خطای سیستم",
     })
+
+
+from utils.i18n import STRINGS
+register(STRINGS)
