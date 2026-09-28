@@ -40,7 +40,7 @@ class MainWindowShellMixin:
             self,
             theme_key=theme_key,
             app_name=f"{APP_NAME}  v{APP_VERSION}",
-            tagline="Intelligent BBS · Cutting Optimization · Smart Inventory",
+            tagline="Bar bending schedule  ·  cutting optimization  ·  inventory",
             on_license=self.open_license_dialog,
             on_dashboard=self._open_dashboard_safe,
             on_insights=self._open_insights_safe,
@@ -61,16 +61,16 @@ class MainWindowShellMixin:
         self.coach.pack(fill="x", padx=4, pady=(0, 2))
 
         body = ttk.Frame(self)
-        body.pack(fill="both", expand=True, padx=6, pady=4)
+        body.pack(fill="both", expand=True, padx=14, pady=(4, 10))
 
         rail_actions = [
-            ("📌  New position", self.open_input_dialog),
-            ("✂️  Cutting plan", self.show_cutting_plan_all),
-            ("📦  Stock", self.show_stock_manager),
-            ("♻️  Scrap bank", self.show_scrap_manager),
-            ("📐  Lap / splice", self.show_lap_splice),
-            ("📊  Dashboard", self._open_dashboard_safe),
-            ("🧠  Agent insights", self._open_insights_safe),
+            ("New position", self.open_input_dialog),
+            ("Cutting plan", self.show_cutting_plan_all),
+            ("Stock", self.show_stock_manager),
+            ("Scrap bank", self.show_scrap_manager),
+            ("Lap / splice", self.show_lap_splice),
+            ("Dashboard", self._open_dashboard_safe),
+            ("Insights", self._open_insights_safe),
         ]
         self.action_rail = ActionRail(body, theme_key=theme_key, actions=rail_actions)
         self.action_rail.pack(side="left", fill="y", padx=(0, 8))
@@ -79,17 +79,17 @@ class MainWindowShellMixin:
         workspace.pack(side="left", fill="both", expand=True)
 
         chip_actions = [
-            ("✏️ Edit", self.edit_selected_bar),
-            ("🗑️ Delete", self.delete_selected_bar),
-            ("📄 HTML report", self.export_html_report),
-            ("📗 Excel", self.export_excel),
-            ("📕 PDF", self.export_pdf),
-            ("BVBS ↕", self.export_bvbs),
+            ("Edit", self.edit_selected_bar),
+            ("Delete", self.delete_selected_bar),
+            ("HTML report", self.export_html_report),
+            ("Excel", self.export_excel),
+            ("PDF", self.export_pdf),
+            ("BVBS", self.export_bvbs),
         ]
         self.cmd_strip = CommandStrip(workspace, theme_key=theme_key, actions=chip_actions)
         self.cmd_strip.pack(fill="x")
 
-        lf_frame = ttk.LabelFrame(workspace, text="  Listofer summary", padding=6)
+        lf_frame = ttk.LabelFrame(workspace, text="Listofer summary", padding=6)
         lf_frame.pack(fill="x", pady=(4, 6))
         columns = ("lf_number", "lf_desc", "rebar_count", "total_weight")
         self.listofer_tree = ttk.Treeview(lf_frame, columns=columns, show="headings", height=3)
@@ -102,7 +102,7 @@ class MainWindowShellMixin:
         self.listofer_tree.pack(fill="x")
         self.listofer_tree.bind("<Double-1>", lambda e: self._on_listofer_double_click())
 
-        bbs_frame = ttk.LabelFrame(workspace, text="  Bar bending schedule", padding=4)
+        bbs_frame = ttk.LabelFrame(workspace, text="Bar bending schedule", padding=4)
         bbs_frame.pack(fill="both", expand=True)
         self.bbs_treeview = BBSTreeview(bbs_frame, self.app, theme_key)
         self.bbs_treeview.pack(fill="both", expand=True)
@@ -204,7 +204,7 @@ class MainWindowShellMixin:
             "stock_manager": self.show_stock_manager,
         }
         toolbar_labels = dict(TOOLBAR_BUTTONS)
-        toolbar_labels["new_rebar"] = "📌 New Pos"
+        toolbar_labels["new_rebar"] = "New Pos"
         for key, cmd in toolbar_actions.items():
             ttk.Button(parent, text=toolbar_labels.get(key, key), command=cmd).pack(side="left", padx=5)
 
