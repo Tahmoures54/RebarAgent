@@ -4,7 +4,9 @@
 
 RebarAgent is a professional **offline-first** desktop app for civil/structural engineers and rebar detailers. Create Bar Bending Schedules, optimize 1D cutting with multi-stock lengths, manage scrap and stock inventory, and export Excel / PDF / HTML / BVBS.
 
-Repository: https://github.com/Tahmoures54/AiRebar
+Default UI language is **English**. Persian is optional (Settings).
+
+Repository: https://github.com/Tahmoures54/RebarAgent
 
 ## Highlights (v1.7.0)
 
@@ -14,13 +16,12 @@ Repository: https://github.com/Tahmoures54/AiRebar
 - **Print HTML** – A4 listofer and cutting reports with Copilot strip and RebarAgent footer (WhatsApp / worker)
 - **Lap splice** – Mabhas 9, Eurocode 2, ACI 318, and site n×db rule
 - **Excel import** – English + Persian column headers, shape/standard aliases
-- **i18n** – English (default) + Persian
 - **Commercial** – USDT TRC20 self-serve; prices and wallet from `.env`
 
 ## Quick start
 
 ```bash
-git clone https://github.com/Tahmoures54/AiRebar.git RebarAgent
+git clone https://github.com/Tahmoures54/RebarAgent.git
 cd RebarAgent
 python -m venv venv
 # Windows: venv\Scripts\activate
@@ -38,6 +39,15 @@ Or: `pip install -e .` then `rebaragent`
 3. Set **Stock** (6 m / 12 m bars) and optional scraps
 4. **Cutting Plan** → review waste → **Confirm Plan** → savings report
 5. Export Excel / PDF / HTML / BVBS
+
+## Tests
+
+```bash
+pip install pytest
+PYTHONPATH=. python -m pytest tests/ -q
+```
+
+GitHub Actions runs the same suite on every push to `main`.
 
 ## Requirements
 
