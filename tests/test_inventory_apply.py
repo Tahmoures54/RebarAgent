@@ -145,3 +145,31 @@ def test_scrap_claim_is_single_use_and_missing_scrap_is_rejected(isolated_db):
     row = isolated_db.fetchone("SELECT used FROM scraps WHERE id = ?", (scrap_id,))
     assert row == (1,)
 
+
+
+def test_stock_consumption_is_conditional_and_never_oversells(isolated_db):
+    from db.models import ProjectModel, StockModel
+
+    pid = ProjectModel.create("stock-atomic-claim", "test")
+    StockModel.add(pid, 16.0, 12000.0, 5, grade="A3")
+
+    assert inventory_apply._consume_stock_bar(pid, 16.0, 12000.0, 4, "A3") is True
+    # The next claim must see the reduced balance and must not go negative.
+    assert inventory_apply._consume_stock_bar(pid, 16.0, 12000.0, 2, "A3") is False
+    row = isolated_db.fetchone(
+        "SELECT quantity FROM stock WHERE project_id = ? AND diameter = ? AND length = ? AND grade = ?",
+        (pid, 16.0, 12000.0, "A3"),
+    )
+    assert row == (1,)
+
+
+def test_stock_consumption_rejects_non_positive_quantity(isolated_db):
+    from db.models import ProjectModel, StockModel
+
+    pid = ProjectModel.create("stock-invalid-claim", "test")
+    StockModel.add(pid, 16.0, 12000.0, 5, grade="A3")
+
+    assert inventory_apply._consume_stock_bar(pid, 16.0, 12000.0, 0, "A3") is False
+    assert inventory_apply._consume_stock_bar(pid, 16.0, 12000.0, -1, "A3") is False
+    row = isolated_db.fetchone("SELECT quantity FROM stock WHERE project_id = ?", (pid,))
+    assert row == (5,)
