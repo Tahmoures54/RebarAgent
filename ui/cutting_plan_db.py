@@ -124,15 +124,24 @@ def _save_plan(project_id, listofer_filter, stock_len, data_hash, plans_per_grou
 
 
 def _confirm_plan(project_id, listofer_filter, stock_len, data_hash):
-    _ensure_cutting_plans_table()
-    now = datetime.datetime.now().isoformat()
+    """Mark a cached plan confirmed and report whether a row was updated."""
     try:
+        _ensure_cutting_plans_table()
+        now = datetime.datetime.now().isoformat()
         with sqlite3.connect(DB_PATH) as conn:
-            conn.execute(
+            cur = conn.execute(
                 """UPDATE cutting_plans SET status = 'confirmed', updated_at = ?
                    WHERE project_id = ? AND listofer_filter IS ? AND stock_len = ? AND data_hash = ?""",
                 (now, project_id, listofer_filter, stock_len, data_hash),
             )
             conn.commit()
+            if cur.rowcount != 1:
+                logger.warning(
+                    "Could not confirm cutting plan: expected one matching row, updated %s",
+                    cur.rowcount,
+                )
+                return False
+        return True
     except Exception as e:
         logger.error(f"Failed to confirm plan: {e}")
+        return False
