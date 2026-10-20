@@ -301,9 +301,10 @@ def match_payment(
             continue
         if tx.to_addr != want_addr:
             continue
-        if tx.contract and tx.contract != USDT_TRC20_CONTRACT:
+        # Fail closed: absent token metadata cannot establish that this is USDT.
+        if tx.contract != USDT_TRC20_CONTRACT:
             continue
-        if tx.symbol and tx.symbol.upper() not in ("USDT", ""):
+        if tx.symbol.upper() != "USDT":
             continue
         if tx.value_micros != amount_micros:
             continue
