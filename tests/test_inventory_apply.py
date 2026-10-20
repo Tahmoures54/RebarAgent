@@ -132,3 +132,16 @@ def test_hash_stable_across_confirm_used_flag(isolated_db, monkeypatch):
     h2 = _compute_data_hash(pid, None, 12.0)
     h3 = _compute_data_hash(pid, None, 12.0)
     assert h2 == h3
+
+def test_scrap_claim_is_single_use_and_missing_scrap_is_rejected(isolated_db):
+    pid = ProjectModel.create("scrap-single-claim", "test")
+    scrap_id = ScrapModel.add_scrap(pid, 16.0, 1200.0, grade="A3")
+
+    assert inventory_apply._mark_scrap_used_raw(scrap_id) is True
+    # Repeated confirmation must not report the same scrap as newly consumed.
+    assert inventory_apply._mark_scrap_used_raw(scrap_id) is False
+    assert inventory_apply._mark_scrap_used_raw(99999999) is False
+
+    row = isolated_db.fetchone("SELECT used FROM scraps WHERE id = ?", (scrap_id,))
+    assert row == (1,)
+
