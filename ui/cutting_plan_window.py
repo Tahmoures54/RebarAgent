@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import html
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from pathlib import Path
@@ -271,12 +272,12 @@ class CuttingPlanWindow(tk.Toplevel):
             return
         try:
             rows = ["<html><head><meta charset='utf-8'><title>Cutting Plan</title></head><body>"]
-            rows.append(f"<h1>Cutting Plan — project {self.project_id}</h1>")
-            rows.append(f"<p>Status: {self.plan_status} · stock {self.stock_len} m</p>")
+            rows.append(f"<h1>Cutting Plan — project {html.escape(str(self.project_id))}</h1>")
+            rows.append(f"<p>Status: {html.escape(str(self.plan_status))} · stock {self.stock_len} m</p>")
             for key in sorted([k for k in self.plans_per_group if isinstance(k, tuple)], key=lambda x: (x[0], x[1])):
                 dia, grade = key
                 data = self.plans_per_group[key]
-                rows.append(f"<h2>Ø{dia:g} mm — {grade}</h2><table border='1' cellpadding='4'>")
+                rows.append(f"<h2>Ø{dia:g} mm — {html.escape(str(grade))}</h2><table border='1' cellpadding='4'>")
                 rows.append("<tr><th>#</th><th>Pieces (m)</th><th>Used</th><th>Waste</th><th>Source</th></tr>")
                 for i, plan in enumerate(data.get("plans") or [], start=1):
                     bin_items = plan.get("bin") or []
