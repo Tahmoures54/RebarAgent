@@ -115,8 +115,10 @@ def _save_plan(project_id, listofer_filter, stock_len, data_hash, plans_per_grou
                 (project_id, listofer_filter, stock_len, data_hash, plans_json, status, now),
             )
             conn.commit()
+        return True
     except Exception as e:
         logger.error(f"Failed to save plan: {e}")
+        return False
 
 
 def _confirm_plan(project_id, listofer_filter, stock_len, data_hash):
