@@ -239,7 +239,14 @@ class CuttingPlanWindow(tk.Toplevel):
             if not messagebox.askyesno(t("cut.reoptimize"), t("cut.revert_ask"), parent=self):
                 return
             try:
-                revert_cutting_plan_inventory(self.project_id, self._inventory_ledger)
+                rollback = revert_cutting_plan_inventory(self.project_id, self._inventory_ledger)
+                if not rollback.get("ok", False):
+                    messagebox.showerror(
+                        t("cut.revert"),
+                        "Inventory rollback was incomplete: " + "; ".join(rollback.get("errors") or []),
+                        parent=self,
+                    )
+                    return
                 try:
                     from utils.events import bus
                     bus.emit("cut.rolled_back", {"project_id": self.project_id})
