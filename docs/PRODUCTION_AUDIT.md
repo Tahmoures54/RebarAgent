@@ -153,3 +153,10 @@ RA-SEC-001 remains **OPEN / P0**: client-bundled HMAC signing secrets remain in 
 - **Linux CI:** Run `39492003887` pytest job passed on code SHA `227d282b3d31fdc3eb04709ff25d266ce2af8c22`.
 - **Windows CI:** The Windows build job for that run was still in progress when this report was updated; do not infer its result.
 - **Important limitation:** The validator is a tested helper but is not yet wired into all optimizer output/display/persistence paths. RA-OPT-001 remains OPEN and this change alone does not certify cutting plans for production.
+
+
+### RA-SEC-001 / RA-PAY-001 update — migration design documented (2026-10-20)
+
+- **Change:** Added docs/LICENSE_SIGNING_REDESIGN.md describing the asymmetric-signature target, external signing authority, payment trust boundary, key rotation, legacy migration choices, and required acceptance tests.
+- **Code status:** No licensing/payment behavior was changed in this step; the embedded HMAC secrets and client-side issuance path remain.
+- **Decision:** RA-SEC-001 and RA-PAY-001 remain OPEN / P0. This is a design artifact, not remediation or production approval.
