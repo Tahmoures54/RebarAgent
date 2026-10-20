@@ -52,8 +52,8 @@ def maybe_enrich_report(report: Any) -> None:
         method="POST",
     )
     try:
-        # nosec B310: parsed_base above limits this to HTTPS or loopback HTTP.
-        with urllib.request.urlopen(req, timeout=4) as resp:
+        # parsed_base above limits this to HTTPS or loopback HTTP.
+        with urllib.request.urlopen(req, timeout=4) as resp:  # nosec B310
             data = json.loads(resp.read().decode("utf-8"))
         text = ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
         text = text.strip()
