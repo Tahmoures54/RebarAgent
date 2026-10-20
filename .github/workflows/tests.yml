@@ -25,3 +25,34 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: python -m pytest tests/ -q
+
+  windows-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest pyinstaller
+      - name: Run test suite on Windows
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python -m pytest tests/ -q
+      - name: Build standalone Windows executable
+        run: python build_exe.py
+      - name: Verify executable exists
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist/RebarAgent/RebarAgent.exe")) {
+            throw "Expected standalone executable was not created."
+          }
+      - name: Upload Windows executable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RebarAgent-Windows-Python311
+          path: dist/RebarAgent/
+          if-no-files-found: error
+          retention-days: 14

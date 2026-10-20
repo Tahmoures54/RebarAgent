@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import html
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from pathlib import Path
@@ -202,12 +203,25 @@ class CuttingPlanWindow(tk.Toplevel):
             return
         try:
             ledger = apply_cutting_plan_inventory(self.project_id, self.plans_per_group, self.stock_len)
-            self._inventory_ledger = ledger
-            self.plans_per_group["_inventory_ledger"] = ledger
-            self.plan_status = "confirmed"
             data_hash = _compute_data_hash(self.project_id, self.listofer_filter, self.stock_len)
-            _save_plan(self.project_id, self.listofer_filter, self.stock_len, data_hash, self.plans_per_group, status="confirmed")
-            _confirm_plan(self.project_id, self.listofer_filter, self.stock_len, data_hash)
+            # Persist the confirmed plan before updating UI state. A failed
+            # save must not leave inventory consumed while the UI reports success.
+            self.plans_per_group["_inventory_ledger"] = ledger
+            saved = _save_plan(
+                self.project_id, self.listofer_filter, self.stock_len,
+                data_hash, self.plans_per_group, status="confirmed",
+            )
+            if not saved:
+                rollback = revert_cutting_plan_inventory(self.project_id, ledger)
+                self.plans_per_group.pop("_inventory_ledger", None)
+                if not rollback.get("ok", False):
+                    raise RuntimeError(
+                        "Could not persist confirmed cutting plan, and inventory "
+                        "rollback was incomplete: " + "; ".join(rollback.get("errors") or [])
+                    )
+                raise RuntimeError("Could not persist confirmed cutting plan; inventory changes were rolled back.")
+            self._inventory_ledger = ledger
+            self.plan_status = "confirmed"
             try:
                 from utils.events import bus
                 bus.emit("cut.confirmed", {"project_id": self.project_id})
@@ -226,7 +240,14 @@ class CuttingPlanWindow(tk.Toplevel):
             if not messagebox.askyesno(t("cut.reoptimize"), t("cut.revert_ask"), parent=self):
                 return
             try:
-                revert_cutting_plan_inventory(self.project_id, self._inventory_ledger)
+                rollback = revert_cutting_plan_inventory(self.project_id, self._inventory_ledger)
+                if not rollback.get("ok", False):
+                    messagebox.showerror(
+                        t("cut.revert"),
+                        "Inventory rollback was incomplete: " + "; ".join(rollback.get("errors") or []),
+                        parent=self,
+                    )
+                    return
                 try:
                     from utils.events import bus
                     bus.emit("cut.rolled_back", {"project_id": self.project_id})
@@ -251,12 +272,12 @@ class CuttingPlanWindow(tk.Toplevel):
             return
         try:
             rows = ["<html><head><meta charset='utf-8'><title>Cutting Plan</title></head><body>"]
-            rows.append(f"<h1>Cutting Plan — project {self.project_id}</h1>")
-            rows.append(f"<p>Status: {self.plan_status} · stock {self.stock_len} m</p>")
+            rows.append(f"<h1>Cutting Plan — project {html.escape(str(self.project_id))}</h1>")
+            rows.append(f"<p>Status: {html.escape(str(self.plan_status))} · stock {self.stock_len} m</p>")
             for key in sorted([k for k in self.plans_per_group if isinstance(k, tuple)], key=lambda x: (x[0], x[1])):
                 dia, grade = key
                 data = self.plans_per_group[key]
-                rows.append(f"<h2>Ø{dia:g} mm — {grade}</h2><table border='1' cellpadding='4'>")
+                rows.append(f"<h2>Ø{dia:g} mm — {html.escape(str(grade))}</h2><table border='1' cellpadding='4'>")
                 rows.append("<tr><th>#</th><th>Pieces (m)</th><th>Used</th><th>Waste</th><th>Source</th></tr>")
                 for i, plan in enumerate(data.get("plans") or [], start=1):
                     bin_items = plan.get("bin") or []
