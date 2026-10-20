@@ -9,6 +9,7 @@ from utils.logger import setup_logger
 from logic.optimizer_options import OptimizerOptions
 from logic.optimizer_packing import _best_fit_decreasing, _pack_one_bar_ffd, _pack_all_single_stock
 from logic.optimizer_metrics import get_scrap_infos_for_dia_grade, get_available_stock_bars
+from logic.optimizer_validation import validate_labeled_cutting_plans
 
 logger = setup_logger("RebarAgent.OptimizerStockflow")
 
@@ -55,9 +56,23 @@ def optimize_with_scraps_and_stock(project_id,diameter,grade,items,stock_length,
     else:
         stock_limit=next((qty for sl,qty in stock_counts.items() if abs(sl-stock_length)<1e-6),None)
         stock_plans,new_scraps=_pack_all_single_stock(remaining,stock_length,opts,cancel_event,stock_limit)
+    all_plans = scrap_plans + stock_plans
+    validation_errors = validate_labeled_cutting_plans(
+        all_plans,
+        items,
+        kerf_m=float(opts.kerf_m or 0.0),
+    )
+    if validation_errors:
+        # Never let an incomplete or physically impossible plan reach the UI,
+        # cache, or inventory-confirmation path as if optimization succeeded.
+        raise ValueError(
+            "Cutting plan failed independent physical validation: "
+            + "; ".join(validation_errors)
+        )
+
     usage=defaultdict(int)
     for p in stock_plans: usage[round(float(p.get("bar_length") or stock_length),6)]+=1
-    return scrap_plans+stock_plans,new_scraps,dict(usage)
+    return all_plans,new_scraps,dict(usage)
 
 
 def compute_plan_data_hash(project_id,listofer_filter,stock_length,data_by_key):
