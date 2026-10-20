@@ -91,17 +91,19 @@ def _load_plan(project_id, listofer_filter, stock_len, data_hash):
 
 
 def _save_plan(project_id, listofer_filter, stock_len, data_hash, plans_per_group, status="draft"):
-    _ensure_cutting_plans_table()
-    serializable = {}
-    for key, data in plans_per_group.items():
-        if isinstance(key, tuple) and len(key) == 2:
-            dia, grade = key
-            serializable[f"({dia}, '{grade}')"] = data
-        else:
-            serializable[str(key)] = data
-    plans_json = json.dumps(serializable)
-    now = datetime.datetime.now().isoformat()
+    # Treat schema setup, serialization, and the write as one reported operation:
+    # callers must never mistake a setup failure for a successful persistence.
     try:
+        _ensure_cutting_plans_table()
+        serializable = {}
+        for key, data in plans_per_group.items():
+            if isinstance(key, tuple) and len(key) == 2:
+                dia, grade = key
+                serializable[f"({dia}, '{grade}')"] = data
+            else:
+                serializable[str(key)] = data
+        plans_json = json.dumps(serializable)
+        now = datetime.datetime.now().isoformat()
         with sqlite3.connect(DB_PATH) as conn:
             conn.execute(
                 """DELETE FROM cutting_plans
