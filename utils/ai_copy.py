@@ -34,8 +34,11 @@ def maybe_enrich_report(report: Any) -> None:
     }
     # The endpoint is configurable for compatible API providers. Reject non-network
     # schemes (notably file:) and disallow plaintext transport for non-local hosts.
-    parsed_base = urlsplit(base)
-    hostname = (parsed_base.hostname or "").lower()
+    try:
+        parsed_base = urlsplit(base)
+        hostname = (parsed_base.hostname or "").lower()
+    except ValueError:
+        return
     local_hosts = {"localhost", "127.0.0.1", "::1"}
     if not hostname or parsed_base.scheme not in {"https", "http"}:
         return
