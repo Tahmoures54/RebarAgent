@@ -15,7 +15,7 @@ from utils.logger import setup_logger
 logger = setup_logger("RebarAgent.CuttingPlanDB")
 
 
-def _ensure_cutting_plan_cache_table():
+def _ensure_cutting_plans_table():
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS cutting_plan_cache (
@@ -59,7 +59,7 @@ def _compute_data_hash(project_id, listofer_filter, stock_len):
 
 
 def _load_plan(project_id, listofer_filter, stock_len, data_hash):
-    _ensure_cutting_plan_cache_table()
+    _ensure_cutting_plans_table()
     try:
         with sqlite3.connect(DB_PATH) as conn:
             cur = conn.execute(
@@ -94,7 +94,7 @@ def _save_plan(project_id, listofer_filter, stock_len, data_hash, plans_per_grou
     # Treat schema setup, serialization, and the write as one reported operation:
     # callers must never mistake a setup failure for a successful persistence.
     try:
-        _ensure_cutting_plan_cache_table()
+        _ensure_cutting_plans_table()
         serializable = {}
         for key, data in plans_per_group.items():
             if isinstance(key, tuple) and len(key) == 2:
@@ -126,7 +126,7 @@ def _save_plan(project_id, listofer_filter, stock_len, data_hash, plans_per_grou
 def _confirm_plan(project_id, listofer_filter, stock_len, data_hash):
     """Mark a cached plan confirmed and report whether a row was updated."""
     try:
-        _ensure_cutting_plan_cache_table()
+        _ensure_cutting_plans_table()
         now = datetime.datetime.now().isoformat()
         with sqlite3.connect(DB_PATH) as conn:
             cur = conn.execute(
