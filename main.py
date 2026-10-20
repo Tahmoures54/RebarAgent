@@ -75,7 +75,44 @@ class RebarAgentApp(tk.Tk):
         self.report_callback_exception = self._global_error_handler
 
     def _run_security_checks(self) -> bool:
-        return True
+        """Run concrete local database integrity checks before opening the UI.
+
+        This is a startup health check, not a substitute for license validation
+        or a claim that a client-side application is tamper-proof.
+        """
+        try:
+            conn = self.db.connection
+            quick_check = conn.execute("PRAGMA quick_check").fetchone()
+            if not quick_check or quick_check[0] != "ok":
+                logger.critical("SQLite quick_check failed: %r", quick_check)
+                messagebox.showerror(
+                    t("err.system"),
+                    "The local database failed an integrity check. "
+                    "Close the application and restore a verified backup.",
+                )
+                return False
+
+            foreign_key_errors = conn.execute("PRAGMA foreign_key_check").fetchmany(1)
+            if foreign_key_errors:
+                logger.critical("SQLite foreign_key_check failed: %r", foreign_key_errors[0])
+                messagebox.showerror(
+                    t("err.system"),
+                    "The local database contains inconsistent references. "
+                    "Close the application and restore a verified backup.",
+                )
+                return False
+            return True
+        except Exception:
+            logger.exception("Startup database integrity check failed")
+            try:
+                messagebox.showerror(
+                    t("err.system"),
+                    "The local database could not be checked. "
+                    "The application will not continue.",
+                )
+            except Exception:
+                pass
+            return False
 
     def _global_error_handler(self, exp_type, exp_value, exp_traceback):
         logger.critical("Uncaught Exception", exc_info=(exp_type, exp_value, exp_traceback))
