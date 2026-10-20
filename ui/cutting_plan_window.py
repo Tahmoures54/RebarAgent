@@ -202,12 +202,25 @@ class CuttingPlanWindow(tk.Toplevel):
             return
         try:
             ledger = apply_cutting_plan_inventory(self.project_id, self.plans_per_group, self.stock_len)
-            self._inventory_ledger = ledger
-            self.plans_per_group["_inventory_ledger"] = ledger
-            self.plan_status = "confirmed"
             data_hash = _compute_data_hash(self.project_id, self.listofer_filter, self.stock_len)
-            _save_plan(self.project_id, self.listofer_filter, self.stock_len, data_hash, self.plans_per_group, status="confirmed")
-            _confirm_plan(self.project_id, self.listofer_filter, self.stock_len, data_hash)
+            # Persist the confirmed plan before updating UI state. A failed
+            # save must not leave inventory consumed while the UI reports success.
+            self.plans_per_group["_inventory_ledger"] = ledger
+            saved = _save_plan(
+                self.project_id, self.listofer_filter, self.stock_len,
+                data_hash, self.plans_per_group, status="confirmed",
+            )
+            if not saved:
+                rollback = revert_cutting_plan_inventory(self.project_id, ledger)
+                self.plans_per_group.pop("_inventory_ledger", None)
+                if not rollback.get("ok", False):
+                    raise RuntimeError(
+                        "Could not persist confirmed cutting plan, and inventory "
+                        "rollback was incomplete: " + "; ".join(rollback.get("errors") or [])
+                    )
+                raise RuntimeError("Could not persist confirmed cutting plan; inventory changes were rolled back.")
+            self._inventory_ledger = ledger
+            self.plan_status = "confirmed"
             try:
                 from utils.events import bus
                 bus.emit("cut.confirmed", {"project_id": self.project_id})
