@@ -21,3 +21,22 @@ def test_save_plan_returns_false_when_sqlite_write_fails(monkeypatch):
     )
 
     assert result is False
+
+
+
+def test_save_plan_returns_false_when_schema_setup_fails(monkeypatch):
+    def fail_setup():
+        raise OSError("simulated schema setup failure")
+
+    monkeypatch.setattr(cutting_plan_db, "_ensure_cutting_plans_table", fail_setup)
+
+    result = cutting_plan_db._save_plan(
+        project_id=1,
+        listofer_filter=None,
+        stock_len=12.0,
+        data_hash="test-hash",
+        plans_per_group={(16.0, "A3"): {"plans": []}},
+        status="draft",
+    )
+
+    assert result is False
