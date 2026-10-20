@@ -76,3 +76,24 @@ def test_confirmed_plan_and_inventory_ledger_survive_reload(tmp_path, monkeypatc
     assert status == "confirmed"
     assert loaded[(16.0, "A3")]["plans"][0]["bar_length"] == 12.0
     assert loaded["_inventory_ledger"]["stock_bars_consumed"] == 1
+
+
+def test_confirm_plan_reports_success_only_when_matching_row_exists(tmp_path, monkeypatch):
+    db_path = str(tmp_path / "confirm_plan.sqlite3")
+    monkeypatch.setattr(cutting_plan_db, "DB_PATH", db_path)
+
+    assert cutting_plan_db._save_plan(
+        project_id=9,
+        listofer_filter=None,
+        stock_len=12.0,
+        data_hash="existing-hash",
+        plans_per_group={(16.0, "A3"): {"plans": []}},
+        status="draft",
+    ) is True
+
+    assert cutting_plan_db._confirm_plan(9, None, 12.0, "existing-hash") is True
+    loaded, status = cutting_plan_db._load_plan(9, None, 12.0, "existing-hash")
+    assert loaded is not None
+    assert status == "confirmed"
+
+    assert cutting_plan_db._confirm_plan(9, None, 12.0, "missing-hash") is False
