@@ -131,3 +131,15 @@ RA-SEC-001 remains **OPEN / P0**: client-bundled HMAC signing secrets remain in 
 - **CI status:** Run for the implementation commit was in progress at the time of this update. The test commit's CI result must be checked before considering this change verified.
 - **Scope limit:** This is only a fail-closed token metadata correction. It does not solve desktop-side license signing secrets, durable atomic TXID consumption, payment order identity/collision risks, or Windows release validation.
 - **Release decision:** **NOT READY FOR PRODUCTION**.
+
+
+## Follow-up — CI and Windows packaging evidence (2026-10-20)
+
+- **Windows CI:** Successful run `39491085635` for commit `7bfe9a4fa38a7525045e8cc2e766cf105d2abf12`. Both `pytest` and `windows-build` jobs passed.
+- **Packaging evidence:** The Windows job successfully ran `python build_exe.py`, verified `dist/RebarAgent/RebarAgent.exe` exists, and uploaded the `RebarAgent-Windows-Python311` artifact (14-day retention).
+- **Linux CI:** Successful run `39491053255` for commit `e85cbd6fe1a0498bb63972a8054dbedbd59dd38d`; both `pytest` and `windows-build` jobs passed for that commit's workflow configuration.
+- **Console encoding fix:** `build_exe.py` now prints an ASCII-only success message to avoid a Windows console encoding error after packaging. Commit: `e85cbd6fe1a0498bb63972a8054dbedbd59dd38d`.
+- **Artifact workflow:** Commit `7bfe9a4fa38a7525045e8cc2e766cf105d2abf12` adds upload-artifact after the executable existence check.
+- **Links:** [Windows build + artifact run](https://github.com/Tahmoures54/RebarAgent/actions/runs/39491085635); [encoding-fix run](https://github.com/Tahmoures54/RebarAgent/actions/runs/39491053255).
+- **Remaining limitation:** This proves the build completes and the expected EXE path exists; it does **not** prove the EXE launches or functions on a clean Windows machine. Clean-machine runtime smoke tests, non-ASCII path checks, database persistence, optimization, and exports remain open.
+- **Current release decision:** **NOT READY FOR PRODUCTION**. The embedded HMAC signing secret and payment idempotency/trust-boundary issues remain release blockers.
