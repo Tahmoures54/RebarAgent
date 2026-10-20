@@ -285,12 +285,10 @@ class ScrapManagerWindow(tk.Toplevel):
         sort_db_col = self._DB_COLUMN_MAP.get(self._sort_col, "date_created")
         direction = "DESC" if self._sort_reverse else "ASC"
         # WHERE clauses use fixed literals and bound values; ORDER BY is allowlisted.
-        query = f"""  # nosec B608
-            SELECT id, diameter, length_mm, grade, date_created, used, listofer_number
-            FROM scraps
-            WHERE {where}
-            ORDER BY {sort_db_col} {direction}
-        """
+        query = (  # nosec B608
+            "SELECT id, diameter, length_mm, grade, date_created, used, listofer_number "
+            "FROM scraps WHERE " + where + " ORDER BY " + sort_db_col + " " + direction
+        )
 
         try:
             scraps = self.parent.db.fetchall(query, tuple(params))
