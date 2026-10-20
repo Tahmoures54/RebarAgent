@@ -10,6 +10,8 @@ import json
 import os
 import re
 import tempfile
+import threading
+from functools import wraps
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -30,6 +32,20 @@ from config import (
 from utils.logger import setup_logger
 
 logger = setup_logger("RebarAgent.USDT")
+
+# Serialize checkout fulfillment within one running desktop process. This
+# narrows double-click/thread races; it is deliberately not described as a
+# cross-process or global payment idempotency guarantee.
+_FULFILLMENT_LOCK = threading.Lock()
+
+
+def _serialize_fulfillment(func):
+    @wraps(func)
+    def wrapped(*args, **kwargs):
+        with _FULFILLMENT_LOCK:
+            return func(*args, **kwargs)
+    return wrapped
+
 
 USDT_DECIMALS = 6
 MICROS_PER_CENT = 10_000  # 0.01 USDT with 6 on-chain decimals
@@ -430,6 +446,7 @@ def find_matching_payment(
     return hit, invoice
 
 
+@_serialize_fulfillment
 def fulfill_paid_plan(
     db,
     sku: str,
