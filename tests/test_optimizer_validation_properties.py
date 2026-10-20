@@ -10,7 +10,7 @@ positive_lengths = st.floats(
     max_value=5.0,
     allow_nan=False,
     allow_infinity=False,
-    width=32,
+    width=64,
 )
 
 
