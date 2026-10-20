@@ -17,6 +17,7 @@ Notes:
 from __future__ import annotations
 
 import json
+import math
 from typing import List, Dict, Optional, Any, Tuple
 
 from db.models import RebarModel
@@ -110,7 +111,7 @@ def generate_bbs_data(project_id: int, listofer_number: Optional[str] = None) ->
             length_mm = float(
                 default_shape_registry.calc_shape_length(shape_name, dimensions, diameter)
             )
-            if not (length_mm >= 0):
+            if not math.isfinite(length_mm) or length_mm < 0:
                 raise ValueError("Calculated shape length is negative or not finite")
         except Exception as exc:
             logger.warning(
