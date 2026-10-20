@@ -64,3 +64,13 @@ def test_ai_copy_allows_https_provider_with_timeout(monkeypatch):
 
     assert calls == [("https://api.example.com/v1/chat/completions", 4, "Bearer test-secret")]
     assert report.headline == "Review the highest-waste bars."
+
+
+def test_ai_copy_silently_rejects_malformed_endpoint(monkeypatch):
+    monkeypatch.setenv("REBARAGENT_AI_API_KEY", "test-secret")
+    monkeypatch.setenv("REBARAGENT_AI_BASE_URL", "http://[invalid")
+    report = _Report()
+
+    ai_copy.maybe_enrich_report(report)
+
+    assert report.headline == "Original headline"
