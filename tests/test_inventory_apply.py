@@ -173,3 +173,36 @@ def test_stock_consumption_rejects_non_positive_quantity(isolated_db):
     assert inventory_apply._consume_stock_bar(pid, 16.0, 12000.0, -1, "A3") is False
     row = isolated_db.fetchone("SELECT quantity FROM stock WHERE project_id = ?", (pid,))
     assert row == (5,)
+
+
+
+def test_scrap_release_is_conditional_and_rejects_already_available_scrap(isolated_db):
+    pid = ProjectModel.create("scrap-conditional-release", "test")
+    scrap_id = ScrapModel.add_scrap(pid, 16.0, 1200.0, grade="A3")
+
+    # Cannot report a rollback as successful if the scrap was never claimed.
+    assert inventory_apply._mark_scrap_unused_raw(scrap_id) is False
+    assert inventory_apply._mark_scrap_used_raw(scrap_id) is True
+    assert inventory_apply._mark_scrap_unused_raw(scrap_id) is True
+    assert inventory_apply._mark_scrap_unused_raw(scrap_id) is False
+    assert inventory_apply._mark_scrap_unused_raw(99999999) is False
+
+    row = isolated_db.fetchone("SELECT used FROM scraps WHERE id = ?", (scrap_id,))
+    assert row == (0,)
+
+
+def test_stock_restore_uses_atomic_increment(isolated_db):
+    from db.models import ProjectModel, StockModel
+
+    pid = ProjectModel.create("stock-atomic-restore", "test")
+    StockModel.add(pid, 16.0, 12000.0, 5, grade="A3")
+
+    assert inventory_apply._restore_stock_bar(pid, 16.0, 12000.0, 3, "A3") is True
+    row = isolated_db.fetchone(
+        "SELECT quantity FROM stock WHERE project_id = ? AND diameter = ? AND length = ? AND grade = ?",
+        (pid, 16.0, 12000.0, "A3"),
+    )
+    assert row == (8,)
+
+    assert inventory_apply._restore_stock_bar(pid, 16.0, 12000.0, 0, "A3") is False
+    assert inventory_apply._restore_stock_bar(pid, 16.0, 12000.0, -2, "A3") is False
