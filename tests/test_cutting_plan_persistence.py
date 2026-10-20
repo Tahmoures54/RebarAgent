@@ -97,3 +97,51 @@ def test_confirm_plan_reports_success_only_when_matching_row_exists(tmp_path, mo
     assert status == "confirmed"
 
     assert cutting_plan_db._confirm_plan(9, None, 12.0, "missing-hash") is False
+
+
+
+def test_cache_uses_separate_table_when_legacy_cutting_plans_schema_exists(tmp_path, monkeypatch):
+    import sqlite3
+
+    db_path = str(tmp_path / "legacy-schema.sqlite3")
+    monkeypatch.setattr(cutting_plan_db, "DB_PATH", db_path)
+
+    # This is the schema created by db.database.DatabaseManager. It predates
+    # the JSON cache columns and must not be mistaken for the cache table.
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("""
+            CREATE TABLE cutting_plans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                listofer_filter TEXT,
+                stock_length_m REAL NOT NULL,
+                data_hash TEXT NOT NULL,
+                status TEXT DEFAULT 'draft',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+    assert cutting_plan_db._save_plan(
+        project_id=4,
+        listofer_filter=None,
+        stock_len=12.0,
+        data_hash="legacy-safe-hash",
+        plans_per_group={(16.0, "A3"): {"plans": []}},
+        status="draft",
+    ) is True
+
+    loaded, status = cutting_plan_db._load_plan(4, None, 12.0, "legacy-safe-hash")
+    assert loaded[(16.0, "A3")]["plans"] == []
+    assert status == "draft"
+
+    with sqlite3.connect(db_path) as conn:
+        legacy_columns = {
+            row[1] for row in conn.execute("PRAGMA table_info(cutting_plans)")
+        }
+        cache_columns = {
+            row[1] for row in conn.execute("PRAGMA table_info(cutting_plan_cache)")
+        }
+
+    assert "stock_length_m" in legacy_columns
+    assert "plans_json" not in legacy_columns
+    assert {"stock_len", "plans_json", "updated_at"} <= cache_columns
