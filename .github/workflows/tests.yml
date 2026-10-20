@@ -49,3 +49,10 @@ jobs:
           if (-not (Test-Path "dist/RebarAgent/RebarAgent.exe")) {
             throw "Expected standalone executable was not created."
           }
+      - name: Upload Windows executable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RebarAgent-Windows-Python311
+          path: dist/RebarAgent/
+          if-no-files-found: error
+          retention-days: 14
