@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import re
+import tempfile
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -222,28 +223,66 @@ def _used_tx_path() -> str:
 
 
 def load_used_txids(path: Optional[str] = None) -> List[str]:
+    """Load the local duplicate-TXID cache.
+
+    A missing file means no local history yet. An unreadable or malformed
+    existing file is an error: treating corruption as an empty cache could
+    permit a previously fulfilled payment to be reused.
+    """
     target = path or _used_tx_path()
     try:
         with open(target, "r", encoding="utf-8") as fh:
             data = json.load(fh)
-        if isinstance(data, list):
-            return [str(x) for x in data]
-        if isinstance(data, dict):
-            return [str(x) for x in data.get("txids", [])]
-    except (OSError, json.JSONDecodeError):
-        pass
-    return []
+    except FileNotFoundError:
+        return []
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"Cannot read used transaction ledger: {target}") from exc
+
+    if isinstance(data, list):
+        txids = data
+    elif isinstance(data, dict) and isinstance(data.get("txids"), list):
+        txids = data["txids"]
+    else:
+        raise RuntimeError(f"Invalid used transaction ledger format: {target}")
+    if any(not isinstance(item, str) or not item.strip() for item in txids):
+        raise RuntimeError(f"Invalid transaction ID in local ledger: {target}")
+    return list(dict.fromkeys(txids))
 
 
 def remember_txid(txid: str, path: Optional[str] = None) -> None:
+    """Persist a local TXID cache using replace-after-flush to avoid torn JSON.
+
+    This is a per-installation durability improvement, not a global uniqueness
+    guarantee and not a substitute for a trusted payment issuer.
+    """
+    value = str(txid or "").strip()
+    if not value:
+        raise ValueError("Transaction ID must not be empty")
     target = path or _used_tx_path()
     used = load_used_txids(target)
-    if txid in used:
+    if value in used:
         return
-    used.append(txid)
-    os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
-    with open(target, "w", encoding="utf-8") as fh:
-        json.dump({"txids": used}, fh, indent=2)
+    used.append(value)
+    folder = os.path.dirname(os.path.abspath(target))
+    os.makedirs(folder, exist_ok=True)
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", dir=folder, prefix=".used_txids_", suffix=".tmp",
+            delete=False,
+        ) as fh:
+            temp_path = fh.name
+            json.dump({"txids": used}, fh, indent=2)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(temp_path, target)
+    except Exception:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+        raise
 
 
 def parse_trc20_transfers(payload: Dict) -> List[Transfer]:
