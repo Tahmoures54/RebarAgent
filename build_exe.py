@@ -29,7 +29,7 @@ def main() -> int:
     print("Running:", " ".join(cmd))
     result = subprocess.call(cmd)
     if result == 0:
-        print(f"Build OK → dist/{name}/")
+        print(f"Build OK: dist/{name}/")
     return result
 
 if __name__ == "__main__":
