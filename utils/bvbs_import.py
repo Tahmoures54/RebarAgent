@@ -8,7 +8,7 @@ Uses strict validation for critical fields and smart parameter guessing.
 import os
 import json
 import datetime
-import xml.etree.ElementTree as ET
+from defusedxml import ElementTree as ET
 from typing import Dict, List, Tuple, Optional
 
 from db.models import RebarModel, ListoferModel
