@@ -143,3 +143,13 @@ RA-SEC-001 remains **OPEN / P0**: client-bundled HMAC signing secrets remain in 
 - **Links:** [Windows build + artifact run](https://github.com/Tahmoures54/RebarAgent/actions/runs/39491085635); [encoding-fix run](https://github.com/Tahmoures54/RebarAgent/actions/runs/39491053255).
 - **Remaining limitation:** This proves the build completes and the expected EXE path exists; it does **not** prove the EXE launches or functions on a clean Windows machine. Clean-machine runtime smoke tests, non-ASCII path checks, database persistence, optimization, and exports remain open.
 - **Current release decision:** **NOT READY FOR PRODUCTION**. The embedded HMAC signing secret and payment idempotency/trust-boundary issues remain release blockers.
+
+
+### RA-OPT-001 update — independent validator foundation (2026-10-20)
+
+- **Change:** Added `logic/optimizer_validation.py` with a solver-independent check for exact requested piece-length multiplicity, invalid/non-finite lengths, and per-bar capacity after kerf.
+- **Tests:** Added `tests/test_optimizer_validation.py` for valid plans, missing/duplicate demand, kerf capacity overflow, non-physical lengths, and invalid kerf.
+- **Documentation:** `docs/OPTIMIZER_VALIDATION.md` records scope, limitations, and integration gates.
+- **Linux CI:** Run `39492003887` pytest job passed on code SHA `227d282b3d31fdc3eb04709ff25d266ce2af8c22`.
+- **Windows CI:** The Windows build job for that run was still in progress when this report was updated; do not infer its result.
+- **Important limitation:** The validator is a tested helper but is not yet wired into all optimizer output/display/persistence paths. RA-OPT-001 remains OPEN and this change alone does not certify cutting plans for production.
