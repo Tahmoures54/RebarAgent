@@ -359,13 +359,7 @@ def _mark_scrap_unused_raw(scrap_id: int) -> bool:
 
 
 def _consume_stock_bar(project_id, diameter, length_mm, quantity, grade=None) -> bool:
-    """Consume stock with a conditional SQL update to prevent concurrent overselling.
-
-    Reading quantity and then writing a computed quantity in separate operations
-    is vulnerable to a lost-update race. The WHERE quantity >= ? predicate makes
-    the decrement itself the atomic claim; a competing consumer can only succeed
-    if enough quantity remains when its UPDATE executes.
-    """
+    """Atomically claim stock without allowing a concurrent oversell."""
     try:
         import db.database as database
 
@@ -374,25 +368,23 @@ def _consume_stock_bar(project_id, diameter, length_mm, quantity, grade=None) ->
             return False
 
         rows = database.db.fetchall(
-            "SELECT id, length, quantity FROM stock "
+            "SELECT id, length FROM stock "
             "WHERE (project_id = ? OR project_id IS NULL) AND diameter = ? "
             "AND (? IS NULL OR grade = ?) ORDER BY length DESC",
             (project_id, diameter, grade, grade),
         )
-        for row in rows:
-            try:
-                stock_id, stored_length, available = row
-                if abs(float(stored_length) - float(length_mm)) >= 1e-3:
-                    continue
-                conn = database.db.connection
-                cursor = conn.execute(
-                    "UPDATE stock SET quantity = quantity - ? "
-                    "WHERE id = ? AND quantity >= ?",
-                    (qty_needed, int(stock_id), qty_needed),
-                )
-                conn.commit()
-                if cursor.rowcount == 1:
-                    return True
+        conn = database.db.connection
+        for stock_id, stored_length in rows:
+            if abs(float(stored_length) - float(length_mm)) >= 1e-3:
+                continue
+            cursor = conn.execute(
+                "UPDATE stock SET quantity = quantity - ? "
+                "WHERE id = ? AND quantity >= ?",
+                (qty_needed, int(stock_id), qty_needed),
+            )
+            conn.commit()
+            if cursor.rowcount == 1:
+                return True
         return False
     except Exception as e:
         try:
