@@ -15,10 +15,10 @@ from utils.logger import setup_logger
 logger = setup_logger("RebarAgent.CuttingPlanDB")
 
 
-def _ensure_cutting_plans_table():
+def _ensure_cutting_plan_cache_table():
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS cutting_plans (
+            CREATE TABLE IF NOT EXISTS cutting_plan_cache (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER NOT NULL,
                 listofer_filter TEXT,
@@ -59,11 +59,11 @@ def _compute_data_hash(project_id, listofer_filter, stock_len):
 
 
 def _load_plan(project_id, listofer_filter, stock_len, data_hash):
-    _ensure_cutting_plans_table()
+    _ensure_cutting_plan_cache_table()
     try:
         with sqlite3.connect(DB_PATH) as conn:
             cur = conn.execute(
-                """SELECT plans_json, status FROM cutting_plans
+                """SELECT plans_json, status FROM cutting_plan_cache
                    WHERE project_id = ? AND listofer_filter IS ? AND stock_len = ? AND data_hash = ?
                    ORDER BY updated_at DESC LIMIT 1""",
                 (project_id, listofer_filter, stock_len, data_hash),
@@ -94,7 +94,7 @@ def _save_plan(project_id, listofer_filter, stock_len, data_hash, plans_per_grou
     # Treat schema setup, serialization, and the write as one reported operation:
     # callers must never mistake a setup failure for a successful persistence.
     try:
-        _ensure_cutting_plans_table()
+        _ensure_cutting_plan_cache_table()
         serializable = {}
         for key, data in plans_per_group.items():
             if isinstance(key, tuple) and len(key) == 2:
@@ -106,12 +106,12 @@ def _save_plan(project_id, listofer_filter, stock_len, data_hash, plans_per_grou
         now = datetime.datetime.now().isoformat()
         with sqlite3.connect(DB_PATH) as conn:
             conn.execute(
-                """DELETE FROM cutting_plans
+                """DELETE FROM cutting_plan_cache
                    WHERE project_id = ? AND listofer_filter IS ? AND stock_len = ? AND data_hash = ?""",
                 (project_id, listofer_filter, stock_len, data_hash),
             )
             conn.execute(
-                """INSERT INTO cutting_plans
+                """INSERT INTO cutting_plan_cache
                    (project_id, listofer_filter, stock_len, data_hash, plans_json, status, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (project_id, listofer_filter, stock_len, data_hash, plans_json, status, now),
@@ -126,11 +126,11 @@ def _save_plan(project_id, listofer_filter, stock_len, data_hash, plans_per_grou
 def _confirm_plan(project_id, listofer_filter, stock_len, data_hash):
     """Mark a cached plan confirmed and report whether a row was updated."""
     try:
-        _ensure_cutting_plans_table()
+        _ensure_cutting_plan_cache_table()
         now = datetime.datetime.now().isoformat()
         with sqlite3.connect(DB_PATH) as conn:
             cur = conn.execute(
-                """UPDATE cutting_plans SET status = 'confirmed', updated_at = ?
+                """UPDATE cutting_plan_cache SET status = 'confirmed', updated_at = ?
                    WHERE project_id = ? AND listofer_filter IS ? AND stock_len = ? AND data_hash = ?""",
                 (now, project_id, listofer_filter, stock_len, data_hash),
             )
