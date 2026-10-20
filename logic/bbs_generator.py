@@ -96,6 +96,8 @@ def generate_bbs_data(project_id: int, listofer_number: Optional[str] = None) ->
             diameter = float(data["diameter"] or 0.0)
         except Exception:
             diameter = 0.0
+        if not math.isfinite(diameter) or diameter <= 0:
+            diameter = 0.0
 
         try:
             quantity = int(data["quantity"] or 1)
