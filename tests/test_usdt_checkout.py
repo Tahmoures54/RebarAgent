@@ -261,3 +261,28 @@ def test_license_dialog_builds_on_plain_tk(isolated_db, tmp_path, monkeypatch):
         dlg.destroy()
     finally:
         root.destroy()
+
+
+
+def test_match_payment_rejects_missing_or_wrong_token_metadata():
+    mid = "mac-aabbccddeeff"
+    amount = expected_amount_micros("pro_3m", mid)
+    now = 1_700_000_000_000
+    base = dict(
+        txid="tx-metadata",
+        to_addr=RECEIVE,
+        value_micros=amount,
+        timestamp_ms=now - 60_000,
+    )
+    missing_contract = Transfer(**base, contract="", symbol="USDT")
+    missing_symbol = Transfer(**base, contract=USDT_TRC20_CONTRACT, symbol="")
+    wrong_symbol = Transfer(**base, contract=USDT_TRC20_CONTRACT, symbol="USDC")
+    wrong_contract = Transfer(**base, contract="TWrongContract", symbol="USDT")
+
+    for transfer in (missing_contract, missing_symbol, wrong_symbol, wrong_contract):
+        assert match_payment(
+            [transfer],
+            address=RECEIVE,
+            amount_micros=amount,
+            now_ms=now,
+        ) is None
