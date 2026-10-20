@@ -107,3 +107,16 @@
 7. Verify dependencies/secrets and reconcile README/RELEASE checklists with actual evidence.
 
 **No production approval is implied by this document. Update every status only after collecting corresponding evidence.**
+
+
+## Follow-up remediation log — 2026-10-20
+
+### RA-SEC-002 update
+- **Change:** `main.py` now runs SQLite `PRAGMA quick_check` and `PRAGMA foreign_key_check` before opening the main window. Failed checks and database exceptions stop startup and show a user-facing error.
+- **Test added:** `tests/test_startup_integrity.py` covers a healthy in-memory database, a closed/broken connection, and a failed quick check.
+- **Commit:** `af2f99bf5776098eb49cf9f80c27ccf9c65e152e` (implementation); `198a1d17a4437fd376b204f1b19d70c5ffee2bad` (tests).
+- **Execution status:** NOT RUN in a local Python runtime. GitHub Actions is the evidence path; its result must be checked before treating the tests as PASS.
+- **Scope caveat:** This is a database integrity gate, not a security guarantee. It does not resolve RA-SEC-001 or the payment trust-boundary risks.
+
+### Current critical status
+RA-SEC-001 remains **OPEN / P0**: client-bundled HMAC signing secrets remain in `utils/license.py`. Do not ship a new production build until a compatible public-key verification design and license migration plan are implemented and tested.
