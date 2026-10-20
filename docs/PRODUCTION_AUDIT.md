@@ -160,3 +160,15 @@ RA-SEC-001 remains **OPEN / P0**: client-bundled HMAC signing secrets remain in 
 - **Change:** Added docs/LICENSE_SIGNING_REDESIGN.md describing the asymmetric-signature target, external signing authority, payment trust boundary, key rotation, legacy migration choices, and required acceptance tests.
 - **Code status:** No licensing/payment behavior was changed in this step; the embedded HMAC secrets and client-side issuance path remain.
 - **Decision:** RA-SEC-001 and RA-PAY-001 remain OPEN / P0. This is a design artifact, not remediation or production approval.
+
+
+
+## Follow-up — inventory claim and rollback hardening (2026-10-20)
+
+- **Code change:** `logic/inventory_apply.py` now uses a conditional SQL update to release scraps only when `used = 1`, and uses SQL arithmetic (`quantity = quantity + ?`) to restore stock rather than a read-then-write quantity replacement.
+- **Validation:** non-positive restore quantities are rejected; failed database operations attempt rollback and report failure.
+- **Regression tests:** `tests/test_inventory_apply.py` now covers conditional scrap release and stock increment behavior.
+- **Commits:** `a9a0ac3e27fa5901c5abc7c6bd6ffb041cb8d62e` (implementation); `1aa5839f3f43d5f782f3d29b48ad46473f920b8a` (tests).
+- **CI evidence:** run `39498817488` for commit `1aa5839f3f43d5f782f3d29b48ad46473f920b8a` has passed the pytest job on Linux and the Windows test-suite step. At last inspection, Windows EXE packaging was still running; do not mark the full run successful until its final conclusion is `success`.
+- **Scope limitation:** these are narrow conditional/atomic row updates, not an all-or-nothing transaction for the complete inventory apply/revert workflow. A process crash between separate committed mutations can still leave inconsistent state, and rollback replay is not protected by a durable idempotency token. RA-INV-001 remains OPEN.
+- **Release decision:** **NOT READY FOR PRODUCTION**. Embedded license-signing secrets and payment trust-boundary issues remain release blockers.
