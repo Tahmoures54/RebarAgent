@@ -284,9 +284,8 @@ class ScrapManagerWindow(tk.Toplevel):
         where = " AND ".join(where_clauses)
         sort_db_col = self._DB_COLUMN_MAP.get(self._sort_col, "date_created")
         direction = "DESC" if self._sort_reverse else "ASC"
-        # nosec B608: WHERE clauses are fixed literals with bound values; ORDER BY
-        # fragments come exclusively from _DB_COLUMN_MAP and a fixed ASC/DESC choice.
-        query = f"""
+        # WHERE clauses use fixed literals and bound values; ORDER BY is allowlisted.
+        query = f"""  # nosec B608
             SELECT id, diameter, length_mm, grade, date_created, used, listofer_number
             FROM scraps
             WHERE {where}
