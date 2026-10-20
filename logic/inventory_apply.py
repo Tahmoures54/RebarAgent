@@ -359,19 +359,46 @@ def _mark_scrap_unused_raw(scrap_id: int) -> bool:
 
 
 def _consume_stock_bar(project_id, diameter, length_mm, quantity, grade=None) -> bool:
-    from db.models import StockModel
+    """Consume stock with a conditional SQL update to prevent concurrent overselling.
+
+    Reading quantity and then writing a computed quantity in separate operations
+    is vulnerable to a lost-update race. The WHERE quantity >= ? predicate makes
+    the decrement itself the atomic claim; a competing consumer can only succeed
+    if enough quantity remains when its UPDATE executes.
+    """
     try:
-        rows = StockModel.get_for_diameter(project_id, diameter, grade)
-        for r in rows:
-            parsed = _parse_stock_row(r)
-            if not parsed:
-                continue
-            stock_id, L, qty = parsed
-            if abs(L - float(length_mm)) < 1e-3 and int(qty) >= int(quantity):
-                StockModel.update_quantity(stock_id, int(qty) - int(quantity))
-                return True
+        import db.database as database
+
+        qty_needed = int(quantity)
+        if qty_needed <= 0:
+            return False
+
+        rows = database.db.fetchall(
+            "SELECT id, length, quantity FROM stock "
+            "WHERE (project_id = ? OR project_id IS NULL) AND diameter = ? "
+            "AND (? IS NULL OR grade = ?) ORDER BY length DESC",
+            (project_id, diameter, grade, grade),
+        )
+        for row in rows:
+            try:
+                stock_id, stored_length, available = row
+                if abs(float(stored_length) - float(length_mm)) >= 1e-3:
+                    continue
+                conn = database.db.connection
+                cursor = conn.execute(
+                    "UPDATE stock SET quantity = quantity - ? "
+                    "WHERE id = ? AND quantity >= ?",
+                    (qty_needed, int(stock_id), qty_needed),
+                )
+                conn.commit()
+                if cursor.rowcount == 1:
+                    return True
         return False
     except Exception as e:
+        try:
+            database.db.connection.rollback()
+        except Exception:
+            pass
         logger.error("consume stock failed: %s", e)
         return False
 
