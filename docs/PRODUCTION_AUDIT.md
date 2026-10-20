@@ -120,3 +120,14 @@
 
 ### Current critical status
 RA-SEC-001 remains **OPEN / P0**: client-bundled HMAC signing secrets remain in `utils/license.py`. Do not ship a new production build until a compatible public-key verification design and license migration plan are implemented and tested.
+
+
+## Follow-up — payment token metadata fail-closed fix (2026-10-20)
+
+- **Code change:** `utils/usdt_payment.py::match_payment` now requires an exact match for `USDT_TRC20_CONTRACT` and the `USDT` symbol. Missing contract/symbol metadata no longer passes the token checks.
+- **Regression test added:** `tests/test_usdt_checkout.py::test_match_payment_rejects_missing_or_wrong_token_metadata` verifies that missing contract, missing symbol, a wrong symbol, and a wrong contract are rejected.
+- **Implementation commit:** `9bec523f9b9613ad0cc6ccb8121bf874061322c4`
+- **Test commit:** `412d5309bee2a18a18a899cfcd99111386248f12`
+- **CI status:** Run for the implementation commit was in progress at the time of this update. The test commit's CI result must be checked before considering this change verified.
+- **Scope limit:** This is only a fail-closed token metadata correction. It does not solve desktop-side license signing secrets, durable atomic TXID consumption, payment order identity/collision risks, or Windows release validation.
+- **Release decision:** **NOT READY FOR PRODUCTION**.
