@@ -346,15 +346,25 @@ def _mark_scrap_used_raw(scrap_id: int) -> bool:
 
 
 def _mark_scrap_unused_raw(scrap_id: int) -> bool:
+    """Release a scrap only when it is currently claimed.
+
+    Conditional update prevents rollback from claiming success for a missing
+    scrap or silently changing a scrap that was already available.
+    """
     try:
         import db.database as database
-        database.db.execute(
-            "UPDATE scraps SET used = 0 WHERE id = ?",
+        conn = database.db.connection
+        cursor = conn.execute(
+            "UPDATE scraps SET used = 0 WHERE id = ? AND used = 1",
             (int(scrap_id),),
-            commit=True,
         )
-        return True
+        conn.commit()
+        return cursor.rowcount == 1
     except Exception:
+        try:
+            database.db.connection.rollback()
+        except Exception:
+            pass
         return False
 
 
@@ -401,18 +411,36 @@ def _parse_stock_row(r):
 
 
 def _restore_stock_bar(project_id, diameter, length_mm, quantity, grade=None) -> bool:
-    from db.models import StockModel
+    """Restore stock with an atomic increment, avoiding lost concurrent updates."""
     try:
-        rows = StockModel.get_for_diameter(project_id, diameter, grade)
-        for r in rows:
-            parsed = _parse_stock_row(r)
-            if not parsed:
+        import db.database as database
+
+        qty_to_restore = int(quantity)
+        if qty_to_restore <= 0:
+            return False
+
+        rows = database.db.fetchall(
+            "SELECT id, length FROM stock "
+            "WHERE (project_id = ? OR project_id IS NULL) AND diameter = ? "
+            "AND (? IS NULL OR grade = ?) ORDER BY length DESC",
+            (project_id, diameter, grade, grade),
+        )
+        conn = database.db.connection
+        for stock_id, stored_length in rows:
+            if abs(float(stored_length) - float(length_mm)) >= 1e-3:
                 continue
-            stock_id, L, qty = parsed
-            if abs(L - float(length_mm)) < 1e-3:
-                StockModel.update_quantity(stock_id, int(qty) + int(quantity))
+            cursor = conn.execute(
+                "UPDATE stock SET quantity = quantity + ? WHERE id = ?",
+                (qty_to_restore, int(stock_id)),
+            )
+            conn.commit()
+            if cursor.rowcount == 1:
                 return True
         return False
     except Exception as e:
+        try:
+            database.db.connection.rollback()
+        except Exception:
+            pass
         logger.error("restore stock failed: %s", e)
         return False
