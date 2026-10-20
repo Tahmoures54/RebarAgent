@@ -90,11 +90,11 @@
 | Baseline commit identified | PASS | Latest commit search returned `86458c9571e972cc534a8190ba79c2501a183c91`. |
 | Hard-coded license secrets reviewed | PASS (finding confirmed) | `utils/license.py` retrieved from baseline. |
 | Always-true security gate reviewed | PASS (finding confirmed) | `main.py` retrieved from baseline. |
-| Full pytest suite | NOT RUN | No repository checkout/runtime test execution has been performed yet. |
+| Full pytest suite | PASS on CI (Linux and Windows) | Runs `39491053255` and `39491085635`; see the follow-up evidence section. |
 | Payment integration tests against live network | NOT RUN | No live payments will be used; controlled mocks are required. |
-| Windows EXE build | BLOCKED | No Windows build runner has been invoked in this audit step. |
-| Clean Windows EXE smoke test | BLOCKED | Requires a clean Windows environment. |
-| GitHub Actions run for final commit | NOT RUN | No audit changes have been merged or run through CI yet. |
+| Windows EXE build | PASS (build only) | Run `39491085635` built the EXE and verified its expected path. |
+| Clean Windows EXE smoke test | NOT RUN | CI verifies build and artifact existence only; no clean-machine launch/functional test has been done. |
+| GitHub Actions run for audit candidate | PASS for tested code commit | Run `39491085635` passed on `7bfe9a4fa38a7525045e8cc2e766cf105d2abf12`; subsequent documentation-only commit is not represented by that run. |
 
 ## Release gates still open
 
