@@ -4,7 +4,7 @@ from ui import cutting_plan_db
 
 
 def test_save_plan_returns_false_when_sqlite_write_fails(monkeypatch):
-    monkeypatch.setattr(cutting_plan_db, "_ensure_cutting_plan_cache_table", lambda: None)
+    monkeypatch.setattr(cutting_plan_db, "_ensure_cutting_plans_table", lambda: None)
 
     def fail_connect(*args, **kwargs):
         raise OSError("simulated database unavailable")
@@ -28,7 +28,7 @@ def test_save_plan_returns_false_when_schema_setup_fails(monkeypatch):
     def fail_setup():
         raise OSError("simulated schema setup failure")
 
-    monkeypatch.setattr(cutting_plan_db, "_ensure_cutting_plan_cache_table", fail_setup)
+    monkeypatch.setattr(cutting_plan_db, "_ensure_cutting_plans_table", fail_setup)
 
     result = cutting_plan_db._save_plan(
         project_id=1,
