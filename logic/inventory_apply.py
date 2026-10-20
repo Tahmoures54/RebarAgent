@@ -321,11 +321,27 @@ def revert_cutting_plan_inventory(project_id: int, ledger: dict) -> dict:
 
 
 def _mark_scrap_used_raw(scrap_id: int) -> bool:
-    from db.models import ScrapModel
+    """Claim an available scrap exactly once.
+
+    The conditional UPDATE prevents a second confirmation from treating an
+    already-used (or missing) scrap as successfully consumed. This is a
+    narrow idempotency guard; the complete stock/scrap operation is not yet
+    one cross-resource SQLite transaction.
+    """
     try:
-        ScrapModel.mark_as_used(int(scrap_id))
-        return True
+        import db.database as database
+        conn = database.db.connection
+        cursor = conn.execute(
+            "UPDATE scraps SET used = 1 WHERE id = ? AND used = 0",
+            (int(scrap_id),),
+        )
+        conn.commit()
+        return cursor.rowcount == 1
     except Exception:
+        try:
+            database.db.connection.rollback()
+        except Exception:
+            pass
         return False
 
 
