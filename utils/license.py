@@ -11,6 +11,9 @@ import hmac
 import hashlib
 import base64
 import uuid
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 from utils.logger import setup_logger
 from config import (
     TRIAL_PERIOD_DAYS,
@@ -21,7 +24,6 @@ from config import (
 
 logger = setup_logger('AI_Rebar.License')
 
-SECRET_KEY = b'AiRebar2025!SecretKeyForLicenseSigning'
 HIDDEN_SECRET = b'AIREBAR_HIDDEN_FILE_SECRET_2025'
 
 HIDDEN_DIR = HIDDEN_LICENSE_DIR
@@ -46,8 +48,47 @@ PLAN_SKU_TO_LICENSE_TYPE = {
 }
 
 
+# Ed25519 public key only. The private signing key must never be packaged with the client.
+LICENSE_PUBLIC_KEY_PEM = b"""-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEAuoViijywZF8ffq23YvE3CJQM6MZsLk7s9UvAq+ICKu8=
+-----END PUBLIC KEY-----
+"""
+
+
+def _canonical_license_payload(machine_id, license_type, expiry_date, issued_date):
+    return json.dumps(
+        {
+            "machine_id": str(machine_id),
+            "license_type": str(license_type),
+            "expiry_date": str(expiry_date),
+            "issued_date": str(issued_date),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def _load_issuer_private_key():
+    """Load the issuer-only private key from a protected PEM file path or PEM env value."""
+    configured = os.environ.get("REBARAGENT_LICENSE_PRIVATE_KEY", "").strip()
+    if not configured:
+        raise RuntimeError(
+            "License issuance is disabled: configure REBARAGENT_LICENSE_PRIVATE_KEY "
+            "only on the trusted license-issuer machine."
+        )
+    if "-----BEGIN PRIVATE KEY-----" in configured:
+        pem = configured.encode("utf-8")
+    else:
+        with open(os.path.expanduser(configured), "rb") as key_file:
+            pem = key_file.read()
+    key = serialization.load_pem_private_key(pem, password=None)
+    if not isinstance(key, Ed25519PrivateKey):
+        raise ValueError("Issuer key must be an Ed25519 private key.")
+    return key
+
+
 def generate_activation_key(machine_id, license_type, expiry_date=None, issued_date=None):
-    """Create a signed activation key (same format as generate_license.py)."""
+    """Issue a v2 Ed25519-signed key. Requires a private key outside the distributed client."""
     if license_type not in LICENSE_DURATION_DAYS:
         raise ValueError(f"Unknown license type: {license_type}")
     issued = issued_date or datetime.date.today().isoformat()
@@ -55,22 +96,37 @@ def generate_activation_key(machine_id, license_type, expiry_date=None, issued_d
     if license_type == "unlimited":
         expiry = expiry_date or "2099-12-31"
     else:
-        expiry = expiry_date or (datetime.date.today() + datetime.timedelta(days=days)).isoformat()
-    msg = f"{machine_id}|{license_type}|{expiry}|{issued}".encode()
-    signature = hmac.new(SECRET_KEY, msg, hashlib.sha256).hexdigest()
-    raw = f"{machine_id}|{license_type}|{expiry}|{issued}|{signature}"
-    return base64.urlsafe_b64encode(raw.encode("utf-8")).decode("ascii")
+        expiry = expiry_date or (datetime.date.fromisoformat(issued) + datetime.timedelta(days=days)).isoformat()
+    # Validate dates before signing to avoid malformed keys from the issuer UI/bot.
+    issued_day = datetime.date.fromisoformat(issued)
+    expiry_day = datetime.date.fromisoformat(expiry)
+    if expiry_day < issued_day:
+        raise ValueError("License expiry cannot precede issue date.")
+    payload = _canonical_license_payload(machine_id, license_type, expiry, issued)
+    signature = _load_issuer_private_key().sign(payload)
+    envelope = {
+        "payload": json.loads(payload.decode("utf-8")),
+        "signature": base64.urlsafe_b64encode(signature).decode("ascii").rstrip("="),
+    }
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(envelope, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    return "v2." + encoded
 
 
 def issue_and_activate(db, plan_sku, machine_id=None):
-    """Build a key for this machine and apply it. Returns (ok, message, key)."""
+    """Local issuance is intentionally unavailable unless an issuer private key is configured."""
     lic_type = PLAN_SKU_TO_LICENSE_TYPE.get(plan_sku)
     if not lic_type:
         return False, f"Unknown plan: {plan_sku}", None
-    mid = machine_id or get_machine_id()
-    key = generate_activation_key(mid, lic_type)
-    ok, message = activate_license(key, db)
-    return ok, message, key if ok else None
+    try:
+        mid = machine_id or get_machine_id()
+        key = generate_activation_key(mid, lic_type)
+        ok, message = activate_license(key, db)
+        return ok, message, key if ok else None
+    except Exception as exc:
+        logger.error("Local license issuance blocked: %s", exc)
+        return False, "Automatic license issuance is unavailable. Contact the license issuer.", None
 
 
 # ----------------------------------------------------------------------
@@ -302,27 +358,54 @@ def get_license_info(db):
 
 
 def activate_license(activation_key, db):
-    """Validate and apply a purchased license key.
-    Returns (success, message) tuple.
-    """
-    _ensure_db_table(db)   # ensure table exists
+    """Verify a v2 Ed25519 activation key and apply it. Legacy HMAC keys are rejected."""
+    _ensure_db_table(db)
     try:
-        raw = base64.urlsafe_b64decode(activation_key.encode('ascii')).decode('utf-8')
-        parts = raw.split('|')
-        if len(parts) != 5:
+        if not isinstance(activation_key, str) or not activation_key.startswith("v2."):
+            return False, "Unsupported activation key version. Please request a new license key."
+        encoded = activation_key[3:]
+        padded = encoded + ("=" * (-len(encoded) % 4))
+        envelope = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8"))
+        payload = envelope.get("payload")
+        signature_text = envelope.get("signature")
+        if not isinstance(payload, dict) or not isinstance(signature_text, str):
             return False, "Invalid key format."
-        key_machine, lic_type, expiry_str, issued_str, signature = parts
-        msg = f"{key_machine}|{lic_type}|{expiry_str}|{issued_str}".encode()
-        expected = hmac.new(SECRET_KEY, msg, hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(expected, signature):
-            logger.error("Activation key signature mismatch")
-            return False, "Key verification failed. Please check the code."
+        required = {"machine_id", "license_type", "expiry_date", "issued_date"}
+        if set(payload) != required:
+            return False, "Invalid key payload."
+        key_machine = payload["machine_id"]
+        lic_type = payload["license_type"]
+        expiry_str = payload["expiry_date"]
+        issued_str = payload["issued_date"]
+        if not isinstance(key_machine, str) or not key_machine:
+            return False, "Invalid machine ID."
+        if lic_type not in LICENSE_DURATION_DAYS:
+            return False, "Unsupported license type."
+        issued_day = datetime.date.fromisoformat(issued_str)
+        expiry_day = datetime.date.fromisoformat(expiry_str)
+        today = datetime.date.today()
+        if issued_day > today:
+            return False, "This license was issued in the future."
+        if expiry_day < today:
+            return False, "This license has expired."
+        if expiry_day < issued_day:
+            return False, "Invalid license date range."
+        signature = base64.urlsafe_b64decode(
+            signature_text + ("=" * (-len(signature_text) % 4))
+        )
+        public_key = serialization.load_pem_public_key(LICENSE_PUBLIC_KEY_PEM)
+        if not isinstance(public_key, Ed25519PublicKey):
+            return False, "License verification is not configured correctly."
+        public_key.verify(
+            signature,
+            _canonical_license_payload(key_machine, lic_type, expiry_str, issued_str),
+        )
         if key_machine != get_machine_id():
             logger.error("Machine ID mismatch")
             return False, "This key is not valid for this machine."
 
-        # Update hidden file
         hidden = _read_hidden_file() or {}
+        hidden['machine_id'] = key_machine
         hidden['license_type'] = lic_type
         hidden.pop('trial_start', None)
         if lic_type != 'unlimited':
@@ -331,20 +414,27 @@ def activate_license(activation_key, db):
             hidden.pop('expiry_date', None)
         _write_hidden_file(hidden)
 
-        # Update database
         _db_set(db, 'license_type', lic_type)
         _db_set(db, 'machine_id', key_machine)
         if lic_type != 'unlimited':
             _db_set(db, 'expiry_date', expiry_str)
+        else:
+            _db_set(db, 'expiry_date', None)
         _db_set(db, 'record_count', '0')
         _db_set(db, 'max_records', '0')
         _db_set(db, 'trial_start', None)
 
         logger.info("License activated: %s", lic_type)
         return True, "License activated successfully! Restart may be required."
+    except InvalidSignature:
+        logger.error("Activation key signature mismatch")
+        return False, "Key verification failed. Please check the code."
+    except (ValueError, TypeError, KeyError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        logger.warning("Invalid activation key: %s", exc)
+        return False, "Invalid activation key."
     except Exception as e:
         logger.error("Activation failed: %s", e)
-        return False, f"An error occurred: {e}"
+        return False, "Activation failed. Please contact support."
 
 
 def format_license_status(db):
