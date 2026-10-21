@@ -27,6 +27,28 @@ def _patch_license_store(monkeypatch, tmp_path):
     monkeypatch.setattr("utils.usdt_payment.HIDDEN_LICENSE_DIR", str(tmp_path))
 
 
+def _configure_test_issuer(monkeypatch, tmp_path):
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from utils import license as license_module
+
+    private_key = Ed25519PrivateKey.generate()
+    private_path = tmp_path / "test-issuer-private.pem"
+    private_path.write_bytes(
+        private_key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
+    public_pem = private_key.public_key().public_bytes(
+        serialization.Encoding.PEM,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    monkeypatch.setenv("REBARAGENT_LICENSE_PRIVATE_KEY", str(private_path))
+    monkeypatch.setattr(license_module, "LICENSE_PUBLIC_KEY_PEM", public_pem)
+
+
 def test_tron_address_checksum():
     from utils.usdt_payment import is_valid_tron_address
     assert is_valid_tron_address("TMuA6YqfCeX8EhbfYEg5y7S4DqzSJireY9")
@@ -165,6 +187,7 @@ def test_parse_trongrid_payload():
 
 
 def test_generate_and_activate_key(isolated_db, tmp_path, monkeypatch):
+    _configure_test_issuer(monkeypatch, tmp_path)
     _patch_license_store(monkeypatch, tmp_path)
     monkeypatch.setattr("utils.license.get_machine_id", lambda: "mac-testmachine")
     key = generate_activation_key("mac-testmachine", "1year")
@@ -176,6 +199,7 @@ def test_generate_and_activate_key(isolated_db, tmp_path, monkeypatch):
 
 
 def test_fulfill_paid_plan_issues_license(isolated_db, tmp_path, monkeypatch):
+    _configure_test_issuer(monkeypatch, tmp_path)
     _patch_license_store(monkeypatch, tmp_path)
     mid = "mac-paidcustomer"
     monkeypatch.setattr("utils.license.get_machine_id", lambda: mid)
