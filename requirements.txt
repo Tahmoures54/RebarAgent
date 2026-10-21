@@ -11,3 +11,5 @@ svgwrite>=1.4.0
 qrcode>=7.0
 pillow>=9.0
 defusedxml>=0.7.1
+
+cryptography>=42.0.0
