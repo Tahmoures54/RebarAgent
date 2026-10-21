@@ -17,6 +17,7 @@ Notes:
 from __future__ import annotations
 
 import json
+import math
 from typing import List, Dict, Optional, Any, Tuple
 
 from db.models import RebarModel
@@ -95,6 +96,8 @@ def generate_bbs_data(project_id: int, listofer_number: Optional[str] = None) ->
             diameter = float(data["diameter"] or 0.0)
         except Exception:
             diameter = 0.0
+        if not math.isfinite(diameter) or diameter <= 0:
+            diameter = 0.0
 
         try:
             quantity = int(data["quantity"] or 1)
@@ -103,4 +106,37 @@ def generate_bbs_data(project_id: int, listofer_number: Optional[str] = None) ->
         if quantity <= 0:
             quantity = 1
 
-        shape_name =
+        shape_name = data["shape_name"]
+        dimensions = _safe_json_loads(data["dimensions_raw"])
+
+        try:
+            length_mm = float(
+                default_shape_registry.calc_shape_length(shape_name, dimensions, diameter)
+            )
+            if not math.isfinite(length_mm) or length_mm < 0:
+                raise ValueError("Calculated shape length is negative or not finite")
+        except Exception as exc:
+            logger.warning(
+                "Could not calculate BBS length for rebar id %s (shape=%r): %s",
+                data["id"], shape_name, exc,
+            )
+            length_mm = 0.0
+
+        unit_weight_kg = (
+            (diameter ** 2) * WEIGHT_COEFFICIENT * (length_mm / 1000.0)
+            if diameter > 0 and length_mm > 0 else 0.0
+        )
+        total_weight_kg = unit_weight_kg * quantity
+
+        bbs_rows.append({
+            **data,
+            "dimensions": dimensions,
+            "length_mm": length_mm,
+            "unit_weight_kg": unit_weight_kg,
+            "total_weight_kg": total_weight_kg,
+            # Compatibility aliases for consumers that use generic weight names.
+            "unit_weight": unit_weight_kg,
+            "total_weight": total_weight_kg,
+        })
+
+    return bbs_rows

@@ -7,6 +7,7 @@ import json
 import os
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 from typing import Any
 
 
@@ -31,6 +32,19 @@ def maybe_enrich_report(report: Any) -> None:
         "max_tokens": 80,
         "temperature": 0.2,
     }
+    # The endpoint is configurable for compatible API providers. Reject non-network
+    # schemes (notably file:) and disallow plaintext transport for non-local hosts.
+    try:
+        parsed_base = urlsplit(base)
+        hostname = (parsed_base.hostname or "").lower()
+    except ValueError:
+        return
+    local_hosts = {"localhost", "127.0.0.1", "::1"}
+    if not hostname or parsed_base.scheme not in {"https", "http"}:
+        return
+    if parsed_base.scheme != "https" and hostname not in local_hosts:
+        return
+
     req = urllib.request.Request(
         f"{base}/chat/completions",
         data=json.dumps(payload).encode("utf-8"),
@@ -41,7 +55,8 @@ def maybe_enrich_report(report: Any) -> None:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=4) as resp:
+        # parsed_base above limits this to HTTPS or loopback HTTP.
+        with urllib.request.urlopen(req, timeout=4) as resp:  # nosec B310
             data = json.loads(resp.read().decode("utf-8"))
         text = ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
         text = text.strip()

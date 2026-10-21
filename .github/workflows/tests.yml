@@ -17,14 +17,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-tk
-      - name: Install dependencies
+      - name: Install dependencies and quality tools
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pytest
+          pip install -r requirements.txt pytest hypothesis bandit pip-audit
       - name: Run tests
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: python -m pytest tests/ -q
+      - name: Static security scan
+        run: bandit -r logic ui utils -ll
+      - name: Dependency vulnerability audit
+        run: pip-audit -r requirements.txt
 
   windows-build:
     runs-on: windows-latest
@@ -36,7 +40,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pytest pyinstaller
+          pip install -r requirements.txt pytest hypothesis pyinstaller
       - name: Run test suite on Windows
         env:
           PYTHONPATH: ${{ github.workspace }}

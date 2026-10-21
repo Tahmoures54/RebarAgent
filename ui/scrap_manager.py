@@ -284,12 +284,11 @@ class ScrapManagerWindow(tk.Toplevel):
         where = " AND ".join(where_clauses)
         sort_db_col = self._DB_COLUMN_MAP.get(self._sort_col, "date_created")
         direction = "DESC" if self._sort_reverse else "ASC"
-        query = f"""
-            SELECT id, diameter, length_mm, grade, date_created, used, listofer_number
-            FROM scraps
-            WHERE {where}
-            ORDER BY {sort_db_col} {direction}
-        """
+        # WHERE clauses use fixed literals and bound values; ORDER BY is allowlisted.
+        query = (
+            "SELECT id, diameter, length_mm, grade, date_created, used, listofer_number "  # nosec B608
+            "FROM scraps WHERE " + where + " ORDER BY " + sort_db_col + " " + direction
+        )
 
         try:
             scraps = self.parent.db.fetchall(query, tuple(params))
@@ -312,10 +311,15 @@ class ScrapManagerWindow(tk.Toplevel):
         self.summary_label.config(text=f"Total Available Length: {total_available:.1f} mm")
 
     def _fetch_distinct(self, column):
-        rows = self.parent.db.fetchall(
-            f"SELECT DISTINCT {column} FROM scraps WHERE project_id = ? AND {column} IS NOT NULL",
-            (self.project_id,)
-        )
+        # Keep identifiers static: SQL parameters can bind values, not column names.
+        queries = {
+            "diameter": "SELECT DISTINCT diameter FROM scraps WHERE project_id = ? AND diameter IS NOT NULL",
+            "grade": "SELECT DISTINCT grade FROM scraps WHERE project_id = ? AND grade IS NOT NULL",
+        }
+        query = queries.get(column)
+        if query is None:
+            raise ValueError("Unsupported scrap filter column")
+        rows = self.parent.db.fetchall(query, (self.project_id,))
         return [r[0] for r in rows]
 
     def _sort_by_column(self, col_name):

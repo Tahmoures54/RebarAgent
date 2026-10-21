@@ -89,7 +89,7 @@ def _ensure_db_table(db):
 def _db_get(db, key, default=None):
     """Fetch a value from license_info, creating table if needed."""
     _ensure_db_table(db)  # ensure table exists before query
-    row = db.fetchone(f"SELECT value FROM {LICENSE_TABLE} WHERE key=?", (key,))
+    row = db.fetchone("SELECT value FROM license_info WHERE key=?", (key,))
     return row[0] if row else default
 
 
