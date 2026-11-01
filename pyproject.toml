@@ -13,7 +13,7 @@ authors = [{ name = "RebarAgent Team" }]
 keywords = ["rebar", "bbs", "cutting-stock", "civil-engineering", "optimization"]
 dependencies = [
     "pandas>=1.3.0", "openpyxl>=3.0.0", "reportlab>=3.6.0", "numpy>=1.20.0",
-    "PuLP>=2.6.0", "mip>=1.15.0", "svgwrite>=1.4.0", "qrcode>=7.0", "pillow>=9.0", "defusedxml>=0.7.1",
+    "PuLP>=2.6.0", "mip>=1.15.0", "svgwrite>=1.4.0", "qrcode>=7.0", "pillow>=9.0", "defusedxml>=0.7.1", "cryptography>=42.0.0",
 ]
 
 [project.optional-dependencies]
